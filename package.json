@@ -1,0 +1,64 @@
+{
+  "name": "@lazyingart/lazyedge",
+  "version": "0.1.0",
+  "description": "A lightweight, default-deny reverse edge for safely connecting private compute to public domains.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Lachlan Chen <lachlan@lazying.art>",
+  "homepage": "https://github.com/lachlanchen/LazyEdge#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lachlanchen/LazyEdge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lachlanchen/LazyEdge/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "lazyedge": "bin/lazyedge.mjs"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "schemas/",
+    "templates/",
+    "examples/",
+    "docs/",
+    "i18n/",
+    "scripts/",
+    "test/",
+    ".env.example",
+    "CITATION.cff",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md"
+  ],
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "test": "node --test --test-reporter=spec",
+    "pack:dry-run": "npm pack --dry-run --json",
+    "release:npm": "node scripts/npm-release.mjs",
+    "release:npm:dry-run": "node scripts/npm-release.mjs patch --dry-run",
+    "publish:npm:current": "node scripts/npm-release.mjs current"
+  },
+  "keywords": [
+    "reverse-tunnel",
+    "edge-gateway",
+    "self-hosted",
+    "caddy",
+    "ssh",
+    "local-llm",
+    "gpu",
+    "zero-trust",
+    "devops"
+  ],
+  "dependencies": {
+    "yaml": "2.9.0"
+  }
+}

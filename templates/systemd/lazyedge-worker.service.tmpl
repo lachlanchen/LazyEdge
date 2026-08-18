@@ -1,0 +1,19 @@
+[Unit]
+Description=LazyEdge private worker guards
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/lazyedge serve worker --config %h/.config/lazyedge/lazyedge.yaml --bindings %h/.config/lazyedge/bindings.worker.yaml
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=default.target

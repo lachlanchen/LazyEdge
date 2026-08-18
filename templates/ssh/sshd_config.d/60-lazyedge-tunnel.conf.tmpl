@@ -1,0 +1,17 @@
+# Reference only. Use renderTunnelSshdConfig() for exact PermitListen entries.
+Match User {{TUNNEL_USER}}
+    AuthenticationMethods publickey
+    PubkeyAuthentication yes
+    PasswordAuthentication no
+    KbdInteractiveAuthentication no
+    AllowTcpForwarding remote
+    AllowStreamLocalForwarding no
+    GatewayPorts no
+    PermitListen 127.0.0.1:{{REMOTE_PORTS}}
+    PermitOpen none
+    AllowAgentForwarding no
+    X11Forwarding no
+    PermitTTY no
+    PermitTunnel no
+    MaxSessions 0
+Match all

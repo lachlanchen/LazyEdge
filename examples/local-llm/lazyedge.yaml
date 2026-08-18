@@ -1,0 +1,48 @@
+apiVersion: lazyedge.lazying.art/v1alpha1
+kind: EdgeProject
+
+metadata:
+  name: home-compute
+
+spec:
+  edge:
+    gatewayListen: 127.0.0.1:17600
+    compatibilityListen: 127.0.0.1:18080
+    httpPort: 10080
+    httpsPort: 10443
+    existingSites:
+      - host: chat.example.com
+        upstream: https://127.0.0.1:8443
+        tlsServerName: chat.example.com
+
+  transport:
+    provider: openssh-reverse
+    sshHost: edge.example.com
+    sshUser: lazyedge-tunnel
+    sshPort: 22
+
+  services:
+    - id: local-llm
+      profile: localllm-openai
+      domains:
+        - llm.example.com
+      edge:
+        upstream: http://127.0.0.1:18008
+      worker:
+        listen: 127.0.0.1:17800
+        target: http://127.0.0.1:8008
+        healthPath: /healthz
+      public:
+        tokenSet: local-llm-users
+        maxBodyBytes: 33554432
+        maxConcurrentRequests: 4
+        idleTimeoutSeconds: 900
+        routes:
+          - path: /v1/models
+            methods: [GET]
+          - path: /v1/chat/completions
+            methods: [POST]
+          - path: /v1/responses
+            methods: [POST]
+          - path: /v1/embeddings
+            methods: [POST]

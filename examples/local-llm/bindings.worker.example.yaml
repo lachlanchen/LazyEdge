@@ -1,0 +1,6 @@
+# Copy only this worker binding to the private compute node.
+# The external client token store must remain on the edge.
+bindings:
+  local-llm:
+    relaySecretFile: ~/.config/lazyedge/secrets/local-llm-relay
+    upstreamAuthorizationFile: ~/.config/lazyedge/secrets/local-llm-upstream-key

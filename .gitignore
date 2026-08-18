@@ -1,0 +1,14 @@
+node_modules/
+coverage/
+dist/
+*.tgz
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+.npmrc
+.lazyedge/
+references/private/**
+!references/private/.gitkeep
+tmp/

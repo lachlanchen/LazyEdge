@@ -1,0 +1,30 @@
+[Unit]
+Description=LazyEdge public 80/443 high-port redirects
+Wants=network-online.target lazyedge-caddy.service
+After=network-online.target
+After=lazyedge-caddy.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/usr/bin/curl --fail --silent --show-error --noproxy '*' --retry 5 --retry-delay 1 --retry-max-time 15 --retry-connrefused --retry-all-errors --connect-timeout 2 --max-time 10 --resolve {{PRESERVED_HOST}}:{{HTTPS_HIGH_PORT}}:127.0.0.1 https://{{PRESERVED_HOST}}:{{HTTPS_HIGH_PORT}}/ --output /dev/null
+ExecStart=/usr/local/libexec/lazyedge-port-redirect start
+RuntimeDirectory=lazyedge-port-redirect
+RuntimeDirectoryMode=0700
+ReadWritePaths=/run/lazyedge-port-redirect
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+CapabilityBoundingSet=CAP_NET_ADMIN
+AmbientCapabilities=CAP_NET_ADMIN
+
+[Install]
+WantedBy=multi-user.target

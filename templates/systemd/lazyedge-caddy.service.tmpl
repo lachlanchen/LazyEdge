@@ -1,0 +1,33 @@
+[Unit]
+Description=LazyEdge shared-SNI Caddy gateway
+Wants=network-online.target lazyedge-edge.service
+After=network-online.target lazyedge-edge.service
+
+[Service]
+Type=simple
+User=caddy
+Group=caddy
+SupplementaryGroups=certread
+Environment=XDG_DATA_HOME=/var/lib/lazyedge-caddy
+Environment=XDG_CONFIG_HOME=/var/lib/lazyedge-caddy
+ExecStartPre=/usr/bin/caddy validate --config /etc/lazyedge/Caddyfile --adapter caddyfile
+ExecStart=/usr/bin/caddy run --config /etc/lazyedge/Caddyfile --adapter caddyfile
+ExecReload=/usr/bin/caddy reload --address unix//run/lazyedge-caddy/admin.sock --config /etc/lazyedge/Caddyfile --adapter caddyfile --force
+Restart=on-failure
+RuntimeDirectory=lazyedge-caddy
+StateDirectory=lazyedge-caddy
+ReadOnlyPaths=/etc/lazyedge -/etc/letsencrypt -/var/www/letsencrypt
+ReadWritePaths=/run/lazyedge-caddy /var/lib/lazyedge-caddy
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run check
+      - name: Audit npm package contents
+        shell: bash
+        run: |
+          npm pack --dry-run --json > "$RUNNER_TEMP/lazyedge-pack.json"
+          node --input-type=module - "$RUNNER_TEMP/lazyedge-pack.json" <<'NODE'
+          import { readFile } from "node:fs/promises";
+          const report = JSON.parse(await readFile(process.argv[2], "utf8"));
+          const files = report.flatMap((entry) => entry.files ?? []).map((entry) => entry.path);
+          const forbidden = files.filter((file) =>
+            /(^|\/)references\/private(\/|$)/i.test(file)
+            || (/(^|\/)\.env(?:\.|$)/i.test(file) && file !== ".env.example")
+            || /(^|\/)(?:\.npmrc|cookies?|login data|history)$/i.test(file)
+            || /\.(?:pem|key|p12|pfx|log)$/i.test(file)
+            || /(^|\/)(?:\.lazyedge|coverage|tmp|cache)(\/|$)/i.test(file)
+          );
+          if (forbidden.length > 0) throw new Error(`Forbidden package files:\n${forbidden.join("\n")}`);
+          process.stdout.write(`Audited ${files.length} package files.\n`);
+          NODE

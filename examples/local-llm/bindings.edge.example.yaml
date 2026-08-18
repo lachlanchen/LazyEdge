@@ -1,0 +1,6 @@
+# Copy only this edge binding to the public gateway.
+# The referenced files must be regular, private files; no upstream model key belongs here.
+bindings:
+  local-llm:
+    relaySecretFile: /etc/lazyedge/secrets/local-llm-relay
+    clientTokenStore: /var/lib/lazyedge/tokens/local-llm-users.json

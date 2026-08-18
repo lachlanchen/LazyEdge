@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lazying.art/schemas/lazyedge/v1alpha1.json",
+  "title": "LazyEdge EdgeProject",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "const": "lazyedge.lazying.art/v1alpha1" },
+    "kind": { "const": "EdgeProject" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["edge", "transport", "services"],
+      "properties": {
+        "edge": { "$ref": "#/$defs/edge" },
+        "transport": { "$ref": "#/$defs/transport" },
+        "services": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": { "$ref": "#/$defs/service" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "listen": {
+      "type": "string",
+      "pattern": "^127\\.0\\.0\\.1:(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
+    },
+    "loopbackHttpUrl": {
+      "type": "string",
+      "pattern": "^http://127\\.0\\.0\\.1:(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
+    },
+    "existingSiteUrl": {
+      "type": "string",
+      "pattern": "^https?://127\\.0\\.0\\.1:(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
+    },
+    "hostname": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 253,
+      "pattern": "^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z][a-z0-9-]{1,62}$"
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gatewayListen"],
+      "properties": {
+        "gatewayListen": { "$ref": "#/$defs/listen" },
+        "compatibilityListen": { "$ref": "#/$defs/listen" },
+        "compatibilityService": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        },
+        "httpPort": { "type": "integer", "minimum": 1024, "maximum": 65535 },
+        "httpsPort": { "type": "integer", "minimum": 1024, "maximum": 65535 },
+        "existingSites": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["host", "upstream"],
+            "properties": {
+              "host": { "$ref": "#/$defs/hostname" },
+              "upstream": { "$ref": "#/$defs/existingSiteUrl" },
+              "tlsServerName": { "$ref": "#/$defs/hostname" }
+            }
+          }
+        }
+      }
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "sshHost", "sshUser"],
+      "properties": {
+        "provider": { "const": "openssh-reverse" },
+        "sshHost": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$"
+        },
+        "sshUser": {
+          "type": "string",
+          "pattern": "^[a-z_][a-z0-9_-]{0,30}$"
+        },
+        "sshPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "hostKeyAlias": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$"
+        }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "methods"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^/(?:[A-Za-z0-9._~-]+/)*[A-Za-z0-9._~-]+$"
+        },
+        "methods": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+          }
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "domains", "edge", "worker", "public"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        },
+        "domains": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/hostname" }
+        },
+        "profile": {
+          "enum": ["generic-http", "localllm-openai"]
+        },
+        "edge": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["upstream"],
+          "properties": {
+            "upstream": { "$ref": "#/$defs/loopbackHttpUrl" }
+          }
+        },
+        "worker": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["listen", "target"],
+          "properties": {
+            "listen": { "$ref": "#/$defs/listen" },
+            "target": { "$ref": "#/$defs/loopbackHttpUrl" },
+            "healthPath": {
+              "type": "string",
+              "maxLength": 256,
+              "pattern": "^/(?!v1/)(?:[A-Za-z0-9._~-]+/)*[A-Za-z0-9._~-]+$"
+            }
+          }
+        },
+        "public": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tokenSet", "routes"],
+          "properties": {
+            "tokenSet": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,62}$"
+            },
+            "routes": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 128,
+              "items": { "$ref": "#/$defs/route" }
+            },
+            "maxBodyBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1073741824
+            },
+            "maxConcurrentRequests": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1024
+            },
+            "idleTimeoutSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            }
+          }
+        }
+      }
+    }
+  }
+}

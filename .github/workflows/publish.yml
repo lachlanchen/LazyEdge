@@ -1,0 +1,72 @@
+name: Publish npm package
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Validate the package without publishing
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - name: Use an npm release with OIDC trusted publishing
+        run: |
+          npm install --global npm@^11.5.1
+          npm --version
+      - run: npm ci
+      - run: npm test
+      - run: npm run check
+      - name: Verify release tag matches package version
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          node --input-type=module -e '
+            import { readFile } from "node:fs/promises";
+            const pkg = JSON.parse(await readFile("package.json", "utf8"));
+            if (process.env.RELEASE_TAG !== `v${pkg.version}`) {
+              throw new Error(`Release tag ${process.env.RELEASE_TAG} does not match v${pkg.version}`);
+            }
+          '
+      - name: Audit npm package contents
+        shell: bash
+        run: |
+          npm pack --dry-run --json > "$RUNNER_TEMP/lazyedge-pack.json"
+          node --input-type=module - "$RUNNER_TEMP/lazyedge-pack.json" <<'NODE'
+          import { readFile } from "node:fs/promises";
+          const report = JSON.parse(await readFile(process.argv[2], "utf8"));
+          const files = report.flatMap((entry) => entry.files ?? []).map((entry) => entry.path);
+          const forbidden = files.filter((file) =>
+            /(^|\/)references\/private(\/|$)/i.test(file)
+            || (/(^|\/)\.env(?:\.|$)/i.test(file) && file !== ".env.example")
+            || /(^|\/)(?:\.npmrc|cookies?|login data|history)$/i.test(file)
+            || /\.(?:pem|key|p12|pfx|log)$/i.test(file)
+            || /(^|\/)(?:\.lazyedge|coverage|tmp|cache)(\/|$)/i.test(file)
+          );
+          if (forbidden.length > 0) throw new Error(`Forbidden package files:\n${forbidden.join("\n")}`);
+          process.stdout.write(`Audited ${files.length} package files.\n`);
+          NODE
+      - name: Publish with npm trusted publishing
+        if: github.event_name == 'release' || inputs.dry_run == false
+        run: npm publish --access public --provenance

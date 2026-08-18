@@ -1,0 +1,21 @@
+# Reference only. Use renderCaddy() to produce validated concrete configuration.
+{
+    admin unix//run/lazyedge-caddy/admin.sock
+    http_port {{HTTP_HIGH_PORT}}
+    https_port {{HTTPS_HIGH_PORT}}
+}
+
+http://{{EXACT_HOST}} {
+    handle /.well-known/acme-challenge/* {
+        root * /var/www/letsencrypt
+        file_server
+    }
+    handle {
+        redir https://{host}{uri} 308
+    }
+}
+
+https://{{EXACT_HOST}} {
+    tls {{FULLCHAIN_PATH}} {{PRIVATE_KEY_PATH}}
+    reverse_proxy http://127.0.0.1:{{GATEWAY_PORT}}
+}

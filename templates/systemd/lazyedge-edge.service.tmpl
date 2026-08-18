@@ -1,0 +1,24 @@
+[Unit]
+Description=LazyEdge authenticated edge gateway
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=lazyedge
+Group=lazyedge
+ExecStart=/usr/local/bin/lazyedge serve edge --config /etc/lazyedge/lazyedge.yaml --bindings /etc/lazyedge/bindings.edge.yaml --service {{COMPATIBILITY_SERVICE}}
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target
