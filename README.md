@@ -33,6 +33,7 @@ flowchart LR
 - **Credential separation:** client, relay, upstream, and SSH credentials are different and stay outside the manifest.
 - **Replaceable transport:** OpenSSH first; the application contract remains decoupled from future WireGuard, rathole, or frp transport.
 - **Migratable edge:** render the same reviewed project on a second cloud, connect it in parallel, test, then move DNS.
+- **Optional private chat:** a dedicated loopback BFF adds streamed browser chat with password login while keeping API tokens and raw model routes server-side.
 
 LazyEdge occupies the same problem space as an ngrok-style reverse tunnel, but it is intentionally narrower: v0.1 exposes reviewed HTTP API routes, not arbitrary TCP ports or ad-hoc public URLs. See [concepts at scale](docs/concepts-at-scale.md) for the technology map.
 
@@ -61,7 +62,7 @@ npx @lazyingart/lazyedge render accounts --config ./lazyedge.yaml \
 npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 ```
 
-The Caddy command above uses Automatic HTTPS. Add `--manual-certificates` only for an existing Certbot `/etc/letsencrypt/live/<host>/` layout. The account renderer requires a dedicated Ed25519 public key; the OpenSSH paths refer to private worker files and do not copy their contents. The systemd command emits a labeled review bundle, or accepts `--component edge|worker|tunnel|caddy|redirect|certbot` for one section.
+The Caddy command above uses Automatic HTTPS. Add `--manual-certificates` only for an existing Certbot `/etc/letsencrypt/live/<host>/` layout. The account renderer requires a dedicated Ed25519 public key; the OpenSSH paths refer to private worker files and do not copy their contents. The systemd command emits a labeled review bundle, or accepts `--component edge|worker|tunnel|caddy|redirect|certbot|chat` for one section when applicable.
 
 Keep runtime bindings split by trust boundary: copy the [edge example](examples/local-llm/bindings.edge.example.yaml) only to the public gateway and the [worker example](examples/local-llm/bindings.worker.example.yaml) only to private compute. The edge process reads the relay secret and external-client token store; the worker process reads the relay secret and private-upstream key. Neither role needs the other role's credential store.
 
@@ -89,6 +90,7 @@ The `v1alpha1` interface is preview. Version 0.1 does not ship remote `apply`, `
 - [Operations and rollback](docs/operations.md)
 - [Alibaba → Huawei or dual-edge migration](docs/migration.md)
 - [LocalLLM + AgInTi integration](docs/integrations/local-llm-aginti.md)
+- [Optional private LocalLLM chat](docs/private-chat.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [How larger multi-server systems relate](docs/concepts-at-scale.md)
 

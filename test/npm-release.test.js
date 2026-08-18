@@ -41,6 +41,10 @@ async function fixture(context, version = "1.2.3") {
     path.join(directory, "package-lock.json"),
     `${JSON.stringify(packageLock, null, 2)}\n`,
   );
+  await writeFile(
+    path.join(directory, "CITATION.cff"),
+    `cff-version: 1.2.0\ntitle: LazyEdge\nversion: ${version}\ndate-released: 2026-08-18\n`,
+  );
   return directory;
 }
 
@@ -179,6 +183,7 @@ test("current recovers a failed publish without another commit or tag", async (c
   assert.equal(fake.state.pushCount, 0);
   assert(fake.state.calls.some(({ command, args }) => command === "npm" && args.join(" ") === "run check"));
   assert.equal(JSON.parse(await readFile(path.join(directory, "package.json"), "utf8")).version, "1.2.4");
+  assert.match(await readFile(path.join(directory, "CITATION.cff"), "utf8"), /^version: 1\.2\.4$/mu);
 
   const recoveryCallsStart = fake.state.calls.length;
   const recoveryOutput = outputSink();
@@ -260,6 +265,30 @@ test("dry-run performs checks without changing release state", async (context) =
   assert.equal(await readFile(path.join(directory, "package.json"), "utf8"), beforePackage);
   assert.equal(await readFile(path.join(directory, "package-lock.json"), "utf8"), beforeLock);
   assert.match(output.text(), /Dry run passed/u);
+});
+
+test("release refuses stale or invalid citation metadata", async (context) => {
+  const directory = await fixture(context);
+  const citationPath = path.join(directory, "CITATION.cff");
+  const fake = fakeCommands(directory);
+
+  await writeFile(
+    citationPath,
+    "cff-version: 1.2.0\ntitle: LazyEdge\nversion: 1.2.2\ndate-released: 2026-08-18\n",
+  );
+  await assert.rejects(
+    releaseNpm({ argv: ["patch", "--dry-run"], cwd: directory, execute: fake.execute }),
+    /CITATION\.cff does not match release v1\.2\.3/u,
+  );
+
+  await writeFile(
+    citationPath,
+    "cff-version: 1.2.0\ntitle: LazyEdge\nversion: 1.2.3\ndate-released: 2026-02-31\n",
+  );
+  await assert.rejects(
+    releaseNpm({ argv: ["patch", "--dry-run"], cwd: directory, execute: fake.execute }),
+    /invalid date-released/u,
+  );
 });
 
 test("an explicit version must move forward", async (context) => {

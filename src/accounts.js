@@ -107,6 +107,7 @@ function shellLiteral(value) {
 export function renderBootstrapScript(input, {
   publicKey,
   serviceUser = "lazyedge",
+  chatServiceUser = "lazyedge-chat",
   tunnelUser,
   certificateGroup = "certread",
   sshdInclude = "/etc/ssh/sshd_config.d/60-lazyedge-tunnel.conf",
@@ -118,8 +119,13 @@ export function renderBootstrapScript(input, {
     "tunnelUser",
   );
   const certGroup = accountName(certificateGroup, "certificateGroup");
+  const hasChat = manifest.spec.services.some((service) => service.chat !== undefined);
+  const chatUser = accountName(chatServiceUser, "chatServiceUser");
   if (edgeUser === sshUser) {
     throw new SecurityError("Edge and tunnel accounts must be separate");
+  }
+  if (hasChat && new Set([edgeUser, sshUser, chatUser]).size !== 3) {
+    throw new SecurityError("Edge, tunnel, and chat accounts must be separate");
   }
   if (sshdInclude !== "/etc/ssh/sshd_config.d/60-lazyedge-tunnel.conf") {
     throw new SecurityError("sshdInclude must use LazyEdge's dedicated include path");
@@ -128,6 +134,13 @@ export function renderBootstrapScript(input, {
   const sshdConfig = renderTunnelSshdConfig(manifest, { tunnelUser: sshUser });
   const edgeHome = `/var/lib/${edgeUser}`;
   const tunnelHome = `/var/lib/${sshUser}`;
+  const chatHome = `/var/lib/${chatUser}`;
+  const chatBootstrap = hasChat
+    ? `ensure_system_user ${shellLiteral(chatUser)} ${shellLiteral(chatHome)}
+install -d -o root -g ${shellLiteral(chatUser)} -m 0750 /etc/lazyedge-chat
+install -d -o root -g root -m 0700 /etc/lazyedge-chat/secrets
+`
+    : "";
 
   return `#!/usr/bin/env bash
 set -euo pipefail
@@ -152,6 +165,7 @@ ensure_system_user() {
 
 ensure_system_user ${shellLiteral(edgeUser)} ${shellLiteral(edgeHome)}
 ensure_system_user ${shellLiteral(sshUser)} ${shellLiteral(tunnelHome)}
+${chatBootstrap}
 
 install -d -o root -g root -m 0755 /opt/lazyedge /opt/lazyedge/releases
 install -d -o root -g root -m 0755 /etc/lazyedge

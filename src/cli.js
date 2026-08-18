@@ -1,4 +1,5 @@
-import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { lstat, mkdir, open as openFile, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -6,7 +7,7 @@ import { loadManifest, manifestDigest } from "./config.js";
 import { startCompatibilityServer, startEdgeServer } from "./edge-server.js";
 import { loadBindings, readPrivateText } from "./runtime-config.js";
 import { generateCapabilityToken } from "./security.js";
-import { TokenStore } from "./token-store.js";
+import { normalizeTokenScope, TokenStore } from "./token-store.js";
 import { startWorkerServer } from "./worker-server.js";
 
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -29,13 +30,18 @@ Usage:
   lazyedge render redirect-helper [--config lazyedge.yaml]
   lazyedge render nat [--config lazyedge.yaml] --direction apply|rollback
   lazyedge token issue --store FILE --set NAME --out FILE [--service ID] [--days N]
+                       [--hosts HOST,...] [--methods METHOD,...] [--paths PATH,...]
   lazyedge token list --store FILE [--set NAME] [--json]
   lazyedge token revoke --store FILE --id ID
   lazyedge secret generate --out FILE [--prefix NAME]
   lazyedge secret import-env --env-file FILE --name NAME --out FILE
   lazyedge secret sync-env --env-file FILE --name NAME --value-file FILE
+  lazyedge chat hash-password --password-file FILE|- --out FILE
+  lazyedge chat create-credentials --username NAME --credentials-out FILE --hash-out FILE
+  lazyedge chat issue-client-token --config FILE --service ID --store FILE --out FILE [--days N]
   lazyedge serve edge --config FILE --bindings FILE [--service COMPATIBILITY_ID]
   lazyedge serve worker --config FILE --bindings FILE [--service ID]
+  lazyedge serve chat --config FILE --service ID --password-hash-file FILE --client-token-file FILE
   lazyedge doctor [--config lazyedge.yaml] [--role edge|worker|all] [--json]
   lazyedge --version
 
@@ -96,6 +102,21 @@ function assertOptions(options, allowed) {
   for (const name of options.keys()) {
     if (!allowed.includes(name)) throw new Error(`Unknown option --${name}`);
   }
+}
+
+function commaListOption(options, name) {
+  const value = stringOption(options, name);
+  if (value === undefined) return undefined;
+  const entries = value.split(",");
+  if (
+    entries.length < 1
+    || entries.length > 256
+    || entries.some((entry) => entry.length === 0 || entry !== entry.trim())
+    || new Set(entries).size !== entries.length
+  ) {
+    throw new Error(`--${name} must be a comma-separated list without blanks or duplicates`);
+  }
+  return entries;
 }
 
 function output(stream, value, json = false) {
@@ -227,6 +248,8 @@ async function renderCommand(kind, options, stdout) {
       "ssh-config-path",
       "ssh-alias",
       "worker-unit",
+      "password-hash-file",
+      "client-token-file",
     ];
     assertOptions(options, ["config", "component", ...pathOptions]);
     const module = await import("./systemd.js");
@@ -237,11 +260,14 @@ async function renderCommand(kind, options, stdout) {
       caddy: ["lazyedge-caddy.service", module.renderCaddySystemd],
       redirect: ["lazyedge-port-redirect.service", module.renderPortRedirectSystemd],
       certbot: ["lazyedge-certbot-deploy-hook", module.renderCertbotDeployHook],
+      ...(manifest.spec.services.some((service) => service.chat !== undefined)
+        ? { chat: ["lazyedge-chat.service", module.renderChatSystemd] }
+        : {}),
     };
     const selected = option(options, "component");
     if (selected !== undefined && !Object.hasOwn(components, selected)) {
       throw new Error(
-        "--component must be edge, worker, tunnel, caddy, redirect, or certbot",
+        "--component must be edge, worker, tunnel, caddy, redirect, certbot, or chat",
       );
     }
     if (selected === undefined && pathOptions.some((name) => options.has(name))) {
@@ -259,6 +285,9 @@ async function renderCommand(kind, options, stdout) {
       caddy: new Set(),
       redirect: new Set(),
       certbot: new Set(),
+      chat: new Set([
+        "executable", "manifest-path", "runtime-path", "password-hash-file", "client-token-file",
+      ]),
     };
     if (selected !== undefined) {
       const unsupported = pathOptions.find(
@@ -295,6 +324,19 @@ async function renderCommand(kind, options, stdout) {
             ...(stringOption(options, "worker-unit") === undefined
               ? {} : { workerUnit: stringOption(options, "worker-unit") }),
           }
+        : selected === "chat"
+          ? {
+              ...(stringOption(options, "executable") === undefined
+                ? {} : { executable: stringOption(options, "executable") }),
+              ...(stringOption(options, "manifest-path") === undefined
+                ? {} : { manifestPath: stringOption(options, "manifest-path") }),
+              ...(stringOption(options, "runtime-path") === undefined
+                ? {} : { pathEnvironment: stringOption(options, "runtime-path") }),
+              ...(stringOption(options, "password-hash-file") === undefined
+                ? {} : { passwordHashPath: stringOption(options, "password-hash-file") }),
+              ...(stringOption(options, "client-token-file") === undefined
+                ? {} : { clientTokenPath: stringOption(options, "client-token-file") }),
+            }
         : {};
     // An executable Certbot hook must begin with its shebang. The labeled
     // wrapper is useful for systemd review bundles, but would make a directly
@@ -345,7 +387,9 @@ async function tokenCommand(action, options, stdout) {
   if (typeof storePath !== "string") throw new Error("--store is required");
   const store = await TokenStore.open({ filePath: path.resolve(storePath) });
   if (action === "issue") {
-    assertOptions(options, ["store", "set", "out", "service", "days"]);
+    assertOptions(options, [
+      "store", "set", "out", "service", "days", "hosts", "methods", "paths",
+    ]);
     const tokenSet = option(options, "set");
     const destination = option(options, "out");
     if (typeof tokenSet !== "string" || typeof destination !== "string") {
@@ -356,22 +400,42 @@ async function tokenCommand(action, options, stdout) {
       throw new Error("--days must be an integer from 1 to 366");
     }
     const serviceId = option(options, "service");
-    const issued = await store.issue({
+    if (serviceId !== undefined && typeof serviceId !== "string") {
+      throw new Error("--service requires a value");
+    }
+    const hosts = commaListOption(options, "hosts");
+    const methods = commaListOption(options, "methods");
+    const paths = commaListOption(options, "paths");
+    const scope = {
+      ...(serviceId ? { serviceIds: [serviceId] } : {}),
+      ...(hosts ? { hosts } : {}),
+      ...(methods ? { methods } : {}),
+      ...(paths ? { paths } : {}),
+    };
+    const { issued, tokenFile } = await issueTokenToFile(store, {
       tokenSet,
       expiresInSeconds: days * 86400,
-      scope: serviceId ? { serviceIds: [serviceId] } : undefined,
-    });
-    const tokenFile = path.resolve(destination);
-    await mkdir(path.dirname(tokenFile), { recursive: true, mode: 0o700 });
-    await writeFile(tokenFile, `${issued.token}\n`, { flag: "wx", mode: 0o600 });
-    output(stdout, JSON.stringify({ id: issued.id, tokenSet, tokenFile, expiresAt: issued.expiresAt }));
+      scope: Object.keys(scope).length > 0 ? scope : undefined,
+    }, destination);
+    output(stdout, JSON.stringify({
+      id: issued.id,
+      tokenSet,
+      tokenFile,
+      expiresAt: issued.expiresAt,
+      scope: issued.scope,
+    }));
     return;
   }
   if (action === "list") {
     assertOptions(options, ["store", "set", "json"]);
     const records = store.list({ tokenSet: option(options, "set") });
     if (option(options, "json", false)) output(stdout, records, true);
-    else for (const record of records) output(stdout, `${record.id} ${record.tokenSet} ${record.expiresAt} ${record.revokedAt ? "revoked" : "active"}`);
+    else for (const record of records) {
+      output(
+        stdout,
+        `${record.id} ${record.tokenSet} ${record.expiresAt} ${record.revokedAt ? "revoked" : "active"} scope=${JSON.stringify(record.scope)}`,
+      );
+    }
     return;
   }
   if (action === "revoke") {
@@ -384,6 +448,153 @@ async function tokenCommand(action, options, stdout) {
     return;
   }
   throw new Error("token requires issue, list, or revoke");
+}
+
+async function issueTokenToFile(store, issueOptions, destination, validate = () => {}) {
+  const tokenFile = path.resolve(destination);
+  await mkdir(path.dirname(tokenFile), { recursive: true, mode: 0o700 });
+  let handle = await openFile(tokenFile, "wx", 0o600);
+  let issued;
+  let complete = false;
+  try {
+    issued = await store.issue(issueOptions);
+    validate(issued);
+    await handle.writeFile(`${issued.token}\n`);
+    await handle.sync();
+    await handle.close();
+    handle = null;
+    complete = true;
+    return { issued, tokenFile };
+  } catch (error) {
+    if (issued !== undefined) {
+      try {
+        await store.revoke(issued.id);
+      } catch (revokeError) {
+        throw new AggregateError(
+          [error, revokeError],
+          "Token output failed and the issued record could not be revoked",
+        );
+      }
+    }
+    throw error;
+  } finally {
+    if (handle !== null) await handle.close().catch(() => {});
+    if (!complete) await unlink(tokenFile).catch(() => {});
+  }
+}
+
+async function chatCommand(action, options, stdout) {
+  if (!new Set(["hash-password", "create-credentials", "issue-client-token"]).has(action)) {
+    throw new Error("chat requires hash-password, create-credentials, or issue-client-token");
+  }
+  if (action === "issue-client-token") {
+    assertOptions(options, ["config", "service", "store", "out", "days"]);
+    const serviceId = option(options, "service");
+    const storePath = option(options, "store");
+    const destination = option(options, "out");
+    const days = Number(option(options, "days", "30"));
+    if (
+      typeof serviceId !== "string"
+      || typeof storePath !== "string"
+      || typeof destination !== "string"
+      || !Number.isSafeInteger(days)
+      || days < 1
+      || days > 366
+    ) {
+      throw new Error(
+        "chat issue-client-token requires --config, --service, --store, --out, and optional --days 1–366",
+      );
+    }
+    const { manifest } = await load(options);
+    const service = manifest.spec.services.find((candidate) => candidate.id === serviceId);
+    if (!service?.chat) throw new Error("--service must name the configured private chat service");
+    const scope = normalizeTokenScope({
+      serviceIds: [service.id],
+      hosts: service.domains,
+      methods: ["GET", "POST"],
+      paths: ["/v1/models", "/v1/chat/completions"],
+    });
+    const store = await TokenStore.open({ filePath: path.resolve(storePath) });
+    const { issued, tokenFile } = await issueTokenToFile(store, {
+      tokenSet: service.public.tokenSet,
+      expiresInSeconds: days * 86400,
+      scope,
+    }, destination, (candidate) => {
+      if (
+        candidate.tokenSet !== service.public.tokenSet
+        || JSON.stringify(candidate.scope) !== JSON.stringify(scope)
+      ) throw new Error("Issued chat token scope did not match the manifest-derived contract");
+    });
+    output(stdout, JSON.stringify({
+      id: issued.id,
+      tokenSet: issued.tokenSet,
+      serviceId: service.id,
+      tokenFile,
+      expiresAt: issued.expiresAt,
+      scope: issued.scope,
+    }));
+    return;
+  }
+  if (action === "create-credentials") {
+    assertOptions(options, ["username", "credentials-out", "hash-out"]);
+    const username = option(options, "username");
+    const credentialsDestination = option(options, "credentials-out");
+    const hashDestination = option(options, "hash-out");
+    if (
+      typeof username !== "string"
+      || !/^[A-Za-z0-9][A-Za-z0-9._@+-]{0,63}$/u.test(username)
+      || typeof credentialsDestination !== "string"
+      || typeof hashDestination !== "string"
+    ) {
+      throw new Error(
+        "chat create-credentials requires a safe --username, --credentials-out, and --hash-out",
+      );
+    }
+    const credentialsPath = path.resolve(credentialsDestination);
+    const passwordHashPath = path.resolve(hashDestination);
+    if (credentialsPath === passwordHashPath) {
+      throw new Error("Credential and password-hash outputs must differ");
+    }
+    const { hashChatPassword } = await import("./chat-server.js");
+    const password = randomBytes(32).toString("base64url");
+    const record = await hashChatPassword(password);
+    await mkdir(path.dirname(credentialsPath), { recursive: true, mode: 0o700 });
+    await mkdir(path.dirname(passwordHashPath), { recursive: true, mode: 0o700 });
+    let credentialsWritten = false;
+    try {
+      await writeFile(
+        credentialsPath,
+        `${JSON.stringify({ version: 1, username, password }, null, 2)}\n`,
+        { flag: "wx", mode: 0o600 },
+      );
+      credentialsWritten = true;
+      await writeFile(passwordHashPath, `${record}\n`, { flag: "wx", mode: 0o600 });
+    } catch (error) {
+      if (credentialsWritten) await unlink(credentialsPath).catch(() => {});
+      throw error;
+    }
+    output(stdout, JSON.stringify({
+      credentialsFile: credentialsPath,
+      passwordHashFile: passwordHashPath,
+      algorithm: "scrypt-v1",
+    }));
+    return;
+  }
+  assertOptions(options, ["password-file", "out"]);
+  const passwordFile = option(options, "password-file");
+  const destination = option(options, "out");
+  if (typeof passwordFile !== "string" || typeof destination !== "string") {
+    throw new Error("chat hash-password requires --password-file and --out");
+  }
+  const { hashChatPassword, readChatPasswordFile } = await import("./chat-server.js");
+  const password = await readChatPasswordFile(
+    passwordFile === "-" ? "-" : path.resolve(passwordFile),
+  );
+  const record = await hashChatPassword(password);
+  const outputPath = path.resolve(destination);
+  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
+  await writeFile(outputPath, `${record}\n`, { flag: "wx", mode: 0o600 });
+  output(stdout, JSON.stringify({ passwordHashFile: outputPath, algorithm: "scrypt-v1" }));
 }
 
 async function secretCommand(action, options, stdout) {
@@ -536,9 +747,48 @@ async function waitForShutdown(handles, stdout) {
 }
 
 async function serveCommand(role, options, stdout) {
+  if (role === "chat") {
+    assertOptions(options, [
+      "config", "service", "password-hash-file", "client-token-file",
+    ]);
+    const { manifest } = await load(options);
+    const serviceId = option(options, "service");
+    const passwordHashFile = option(options, "password-hash-file");
+    const clientTokenFile = option(options, "client-token-file");
+    if (
+      typeof serviceId !== "string"
+      || typeof passwordHashFile !== "string"
+      || typeof clientTokenFile !== "string"
+    ) {
+      throw new Error(
+        "serve chat requires --service, --password-hash-file, and --client-token-file",
+      );
+    }
+    const { startChatServer } = await import("./chat-server.js");
+    const handle = await startChatServer({
+      manifest,
+      serviceId,
+      passwordHash: await readPrivateText(
+        path.resolve(passwordHashFile),
+        `${serviceId} chat password hash`,
+      ),
+      clientToken: await readPrivateText(
+        path.resolve(clientTokenFile),
+        `${serviceId} chat client token`,
+      ),
+    });
+    try {
+      output(stdout, `LazyEdge private chat ${serviceId} listening on ${handle.url}`);
+      await waitForShutdown([handle], stdout);
+    } catch (error) {
+      await handle.close();
+      throw error;
+    }
+    return;
+  }
   assertOptions(options, ["config", "bindings", "service"]);
   if (!new Set(["edge", "worker"]).has(role)) {
-    throw new Error("serve requires edge or worker");
+    throw new Error("serve requires edge, worker, or chat");
   }
   const bindingsPath = option(options, "bindings");
   if (typeof bindingsPath !== "string") throw new Error("serve requires --bindings");
@@ -649,13 +899,20 @@ export async function runCli(argv, { stdout, stderr } = {}) {
       return 0;
     }
     const command = argv[0];
-    if (command === "render" || command === "token" || command === "secret" || command === "serve") {
+    if (
+      command === "render"
+      || command === "token"
+      || command === "secret"
+      || command === "chat"
+      || command === "serve"
+    ) {
       const action = argv[1];
       const { options, positionals } = parseOptions(argv.slice(2));
       if (positionals.length > 0) throw new Error(`Unexpected argument ${positionals[0]}`);
       if (command === "render") await renderCommand(action, options, out);
       if (command === "token") await tokenCommand(action, options, out);
       if (command === "secret") await secretCommand(action, options, out);
+      if (command === "chat") await chatCommand(action, options, out);
       if (command === "serve") await serveCommand(action, options, out);
       return 0;
     }

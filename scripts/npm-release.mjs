@@ -130,6 +130,35 @@ function validatePackageLock(packageLock, packageJson, version = packageJson.ver
   }
 }
 
+function updateCitation(citation, version, releasedAt = new Date()) {
+  const versionMatches = citation.match(/^version:\s*[^\r\n]+$/gmu) ?? [];
+  const dateMatches = citation.match(/^date-released:\s*[^\r\n]+$/gmu) ?? [];
+  if (versionMatches.length !== 1 || dateMatches.length !== 1) {
+    throw new Error("CITATION.cff must contain exactly one version and date-released field");
+  }
+  return citation
+    .replace(/^version:\s*[^\r\n]+$/mu, `version: ${version}`)
+    .replace(
+      /^date-released:\s*[^\r\n]+$/mu,
+      `date-released: ${releasedAt.toISOString().slice(0, 10)}`,
+    );
+}
+
+function validateCitation(citation, version) {
+  const versionMatches = [...citation.matchAll(/^version:\s*([^\r\n]+)$/gmu)];
+  const dateMatches = [...citation.matchAll(/^date-released:\s*(\d{4}-\d{2}-\d{2})$/gmu)];
+  if (versionMatches.length !== 1 || dateMatches.length !== 1) {
+    throw new Error("CITATION.cff must contain exactly one valid version and date-released field");
+  }
+  if (versionMatches[0][1].trim() !== version) {
+    throw new Error(`CITATION.cff does not match release v${version}`);
+  }
+  const releasedAt = new Date(`${dateMatches[0][1]}T00:00:00.000Z`);
+  if (Number.isNaN(releasedAt.getTime()) || releasedAt.toISOString().slice(0, 10) !== dateMatches[0][1]) {
+    throw new Error("CITATION.cff has an invalid date-released field");
+  }
+}
+
 function isRegistryNotFound(error) {
   if (!(error instanceof Error)) return false;
   return [error.message, error.stdout, error.stderr].some(
@@ -226,12 +255,15 @@ export async function releaseNpm({
 
   const packagePath = path.join(directory, "package.json");
   const lockPath = path.join(directory, "package-lock.json");
+  const citationPath = path.join(directory, "CITATION.cff");
   const originalPackage = await readFile(packagePath, "utf8");
   const originalLock = await readFile(lockPath, "utf8");
+  const originalCitation = await readFile(citationPath, "utf8");
   const packageJson = parseJson(originalPackage, "package.json");
   const packageLock = parseJson(originalLock, "package-lock.json");
   const binName = validatePackage(packageJson);
   validatePackageLock(packageLock, packageJson);
+  validateCitation(originalCitation, packageJson.version);
 
   const target = nextVersion(packageJson.version, requested);
   const recovery = requested === "current";
@@ -261,6 +293,7 @@ export async function releaseNpm({
     packageJson.version = target;
     try {
       await writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`, { mode: 0o644 });
+      await writeFile(citationPath, updateCitation(originalCitation, target), { mode: 0o644 });
       command("npm", ["install", "--package-lock-only", "--ignore-scripts"], { inherit: true });
       const updatedLock = parseJson(await readFile(lockPath, "utf8"), "package-lock.json");
       validatePackageLock(updatedLock, packageJson, target);
@@ -270,9 +303,10 @@ export async function releaseNpm({
     } catch (error) {
       await writeFile(packagePath, originalPackage, { mode: 0o644 });
       await writeFile(lockPath, originalLock, { mode: 0o644 });
+      await writeFile(citationPath, originalCitation, { mode: 0o644 });
       throw error;
     }
-    command("git", ["add", "package.json", "package-lock.json"]);
+    command("git", ["add", "package.json", "package-lock.json", "CITATION.cff"]);
     command("git", ["commit", "-m", `Release v${target}`], { inherit: true });
     command("git", ["tag", `v${target}`]);
     checkpointReady = true;

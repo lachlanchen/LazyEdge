@@ -198,6 +198,72 @@ export function renderWorkerSystemd(input, {
   ].join("\n");
 }
 
+export function renderChatSystemd(input, {
+  serviceUser = "lazyedge-chat",
+  executable = "/usr/local/bin/lazyedge",
+  manifestPath = "/etc/lazyedge-chat/lazyedge.yaml",
+  passwordHashPath,
+  clientTokenPath,
+  pathEnvironment,
+  description = "LazyEdge private LocalLLM chat",
+} = {}) {
+  const manifest = normalizeManifest(input);
+  const chatServices = manifest.spec.services.filter((service) => service.chat !== undefined);
+  if (chatServices.length !== 1) {
+    throw new SecurityError("Chat systemd unit requires exactly one configured chat service");
+  }
+  const service = chatServices[0];
+  const user = account(serviceUser, "serviceUser");
+  const binary = absolutePath(executable, "executable");
+  const manifestFile = absolutePath(manifestPath, "manifestPath");
+  const passwordFile = absolutePath(
+    passwordHashPath ?? `/etc/lazyedge-chat/secrets/${service.id}-chat-password-hash`,
+    "passwordHashPath",
+  );
+  const tokenFile = absolutePath(
+    clientTokenPath ?? `/etc/lazyedge-chat/secrets/${service.id}-chat-client-token`,
+    "clientTokenPath",
+  );
+  const executablePath = runtimePath(pathEnvironment);
+  return [
+    "[Unit]",
+    `Description=${assertDescription(description)}`,
+    "Wants=network-online.target lazyedge-edge.service",
+    "After=network-online.target lazyedge-edge.service",
+    "StartLimitIntervalSec=300",
+    "StartLimitBurst=5",
+    "",
+    "[Service]",
+    "Type=simple",
+    `User=${user}`,
+    `Group=${user}`,
+    ...(executablePath === undefined ? [] : [`Environment=PATH=${executablePath}`]),
+    `LoadCredential=chat-password-hash:${passwordFile}`,
+    `LoadCredential=chat-client-token:${tokenFile}`,
+    `ExecStart=${binary} serve chat --config ${manifestFile} --service ${service.id} --password-hash-file %d/chat-password-hash --client-token-file %d/chat-client-token`,
+    "Restart=on-failure",
+    "RestartSec=5s",
+    "TimeoutStartSec=30s",
+    "TimeoutStopSec=30s",
+    "RuntimeDirectory=lazyedge-chat",
+    "RuntimeDirectoryMode=0700",
+    "ReadOnlyPaths=/etc/lazyedge-chat",
+    "InaccessiblePaths=-/etc/lazyedge -/var/lib/lazyedge -/var/log/lazyedge",
+    "IPAddressDeny=any",
+    "IPAddressAllow=localhost",
+    "MemoryMax=512M",
+    "TasksMax=64",
+    "LimitNOFILE=1024",
+    "ProtectProc=invisible",
+    "ProcSubset=pid",
+    ...commonHardening({ protectHome: "true" }),
+    "",
+    "[Install]",
+    "WantedBy=multi-user.target",
+    "",
+  ].join("\n");
+}
+
 export function renderTunnelSystemd(input, {
   sshConfigPath = "%h/.config/lazyedge/ssh/config",
   sshAlias = "lazyedge-edge",
@@ -241,16 +307,19 @@ export function renderCaddySystemd(input, {
   configPath = "/etc/lazyedge/Caddyfile",
   description = "LazyEdge shared-SNI Caddy gateway",
 } = {}) {
-  normalizeManifest(input);
+  const manifest = normalizeManifest(input);
   const user = account(caddyUser, "caddyUser");
   const certGroup = account(certificateGroup, "certificateGroup");
   const binary = absolutePath(executable, "executable");
   const config = absolutePath(configPath, "configPath");
+  const chatDependency = manifest.spec.services.some((service) => service.chat !== undefined)
+    ? " lazyedge-chat.service"
+    : "";
   return [
     "[Unit]",
     `Description=${assertDescription(description)}`,
-    "Wants=network-online.target lazyedge-edge.service",
-    "After=network-online.target lazyedge-edge.service",
+    `Wants=network-online.target lazyedge-edge.service${chatDependency}`,
+    `After=network-online.target lazyedge-edge.service${chatDependency}`,
     "StartLimitIntervalSec=300",
     "StartLimitBurst=5",
     "",
@@ -701,12 +770,15 @@ export function renderPortRedirectSystemd(input, {
 }
 
 export function renderSystemdBundle(input, { mode = "root" } = {}) {
-  normalizeManifest(input);
+  const manifest = normalizeManifest(input);
   if (!new Set(["root", "user", "all"]).has(mode)) {
     throw new SecurityError("systemd render mode must be root, user, or all");
   }
   const root = Object.freeze({
     "lazyedge-edge.service": renderEdgeSystemd(input),
+    ...(manifest.spec.services.some((service) => service.chat !== undefined)
+      ? { "lazyedge-chat.service": renderChatSystemd(input) }
+      : {}),
     "lazyedge-caddy.service": renderCaddySystemd(input),
     "lazyedge-port-redirect.service": renderPortRedirectSystemd(input),
   });

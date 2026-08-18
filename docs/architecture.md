@@ -25,7 +25,7 @@ flowchart LR
 6. The worker guard validates and removes the relay credential, repeats the route checks, and injects the private service's distinct Bearer credential.
 7. The local service answers. Its port never becomes a public listener.
 
-Caddy supports streaming responses and WebSocket upgrades through its reverse proxy. LazyEdge still applies the declared route and resource contract before traffic reaches a worker. See the [Caddy reverse proxy documentation](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy).
+Caddy itself supports streaming responses and WebSocket upgrades, but LazyEdge v0.1 intentionally strips `Upgrade` and implements HTTP/SSE only. End-to-end WebSocket forwarding is not part of the current contract. LazyEdge applies the declared route and resource limits before HTTP traffic reaches a worker. See the [Caddy reverse proxy documentation](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy).
 
 ## Components and trust zones
 
@@ -37,6 +37,7 @@ Caddy supports streaming responses and WebSocket upgrades through its reverse pr
 | SSH client | private worker | outbound only | maintains the remote forward |
 | worker guard | private worker | no; loopback only | relay auth, duplicate policy, upstream auth |
 | private service | private worker | no; loopback only | LocalLLM, Whisper, SoVITS, or another approved API |
+| private chat BFF | cloud edge | no; `127.0.0.1:17610` | browser login/session, stable model aliases, strict text SSE |
 
 The default transport is OpenSSH because it is widely available, inspectable, and sufficient for a small number of workers. [WireGuard](https://www.wireguard.com/) is a good future transport when many private services should share one routed overlay. [rathole](https://github.com/rathole-org/rathole) and [frp](https://gofrp.org/en/docs/overview/) are purpose-built reverse-tunnel alternatives. LazyEdge treats transport as replaceable; the route and authentication contract stays above it.
 
@@ -53,6 +54,8 @@ Runtime bindings preserve the same split. The edge loads only its relay secret a
 `spec.edge.compatibilityListen` reserves a loopback-only adapter for an existing application on the same cloud host. It is useful when that application should call a selected LazyEdge service without going out through public DNS. The adapter still requires an external Bearer token for every public API route, replaces it with the relay credential, and applies the same exact method/path policy. Its unauthenticated health endpoint is loopback-only and relays only the configured private health check.
 
 This is not a bypass and must never bind to a public or LAN address. When multiple services exist, the supervising unit selects one explicit service ID for each compatibility listener.
+
+The optional [private chat](private-chat.md) uses this compatibility listener as its only upstream. It runs under a separate account, holds one narrowly scoped external token through systemd credentials, and never calls the public gateway by spoofing a Host header. Caddy routes only the exact browser contract to the BFF; the ordinary `/v1` Bearer path remains on the edge guard.
 
 ## Default-deny contract
 

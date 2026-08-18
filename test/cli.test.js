@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { chmod, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { chmod, mkdtemp, readFile, stat, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Writable } from "node:stream";
@@ -37,6 +38,7 @@ test("help and version are deterministic", async () => {
   assert.equal(help.code, 0);
   assert.match(help.stdout, /lazyedge serve edge .*COMPATIBILITY_ID/u);
   assert.match(help.stdout, /lazyedge serve worker .*--service ID/u);
+  assert.match(help.stdout, /chat issue-client-token .*--service ID/u);
   assert.match(help.stdout, /doctor .*--role edge\|worker\|all/u);
   assert.equal(help.stderr, "");
 
@@ -221,6 +223,161 @@ test("token lifecycle writes raw token only to the requested private file", asyn
   const revoked = await invoke(["token", "revoke", "--store", storePath, "--id", metadata.id]);
   assert.equal(revoked.code, 0, revoked.stderr);
 });
+
+test("token issue accepts only normalized exact multi-axis scopes", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "lazyedge-token-scope-"));
+  const storePath = path.join(directory, "tokens.json");
+  const tokenPath = path.join(directory, "chat-client.token");
+  const issued = await invoke([
+    "token", "issue",
+    "--store", storePath,
+    "--set", "local-llm-users",
+    "--service", "local-llm",
+    "--hosts", "llm.example.com",
+    "--methods", "GET,POST",
+    "--paths", "/v1/models,/v1/chat/completions",
+    "--out", tokenPath,
+  ]);
+  assert.equal(issued.code, 0, issued.stderr);
+  const stored = JSON.parse(await readFile(storePath, "utf8"));
+  assert.deepEqual(stored.tokens[0].scope, {
+    serviceIds: ["local-llm"],
+    hosts: ["llm.example.com"],
+    methods: ["GET", "POST"],
+    paths: ["/v1/chat/completions", "/v1/models"],
+  });
+
+  for (const [name, value, pattern] of [
+    ["methods", "GET,GET", /duplicates/u],
+    ["hosts", "*.example.com", /exact DNS name/u],
+    ["paths", "/v1/models,", /without blanks/u],
+  ]) {
+    const rejected = await invoke([
+      "token", "issue",
+      "--store", storePath,
+      "--set", "local-llm-users",
+      `--${name}`, value,
+      "--out", path.join(directory, `rejected-${name}.token`),
+    ]);
+    assert.equal(rejected.code, 1);
+    assert.match(rejected.stderr, pattern);
+  }
+  assert.equal(JSON.parse(await readFile(storePath, "utf8")).tokens.length, 1);
+
+  const occupied = path.join(directory, "occupied.token");
+  await writeFile(occupied, "owner-data\n", { mode: 0o600 });
+  const refusedOutput = await invoke([
+    "token", "issue",
+    "--store", storePath,
+    "--set", "local-llm-users",
+    "--out", occupied,
+  ]);
+  assert.equal(refusedOutput.code, 1);
+  assert.equal(JSON.parse(await readFile(storePath, "utf8")).tokens.length, 1);
+});
+
+test("chat client token scope is derived and verified from the manifest", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "lazyedge-chat-token-"));
+  const manifestPath = path.join(directory, "lazyedge.yaml");
+  const storePath = path.join(directory, "tokens.json");
+  const tokenPath = path.join(directory, "chat-client.token");
+  await writeFile(
+    manifestPath,
+    await readFile(new URL("../examples/local-llm/lazyedge.chat-overlay.example.yaml", import.meta.url)),
+    { mode: 0o600 },
+  );
+  const issued = await invoke([
+    "chat", "issue-client-token",
+    "--config", manifestPath,
+    "--service", "local-llm",
+    "--store", storePath,
+    "--out", tokenPath,
+    "--days", "30",
+  ]);
+  assert.equal(issued.code, 0, issued.stderr);
+  const metadata = JSON.parse(issued.stdout);
+  assert.deepEqual(metadata.scope, {
+    serviceIds: ["local-llm"],
+    hosts: ["llm.example.com"],
+    methods: ["GET", "POST"],
+    paths: ["/v1/chat/completions", "/v1/models"],
+  });
+  const rawToken = (await readFile(tokenPath, "utf8")).trim();
+  assert.match(rawToken, /^le1_/u);
+  assert.equal(issued.stdout.includes(rawToken), false);
+  assert.equal((await stat(tokenPath)).mode & 0o777, 0o600);
+  const stored = JSON.parse(await readFile(storePath, "utf8"));
+  assert.deepEqual(stored.tokens[0].scope, metadata.scope);
+  assert.equal(stored.tokens[0].id, metadata.id);
+
+  const wrongService = await invoke([
+    "chat", "issue-client-token",
+    "--config", manifestPath,
+    "--service", "missing",
+    "--store", storePath,
+    "--out", path.join(directory, "wrong.token"),
+  ]);
+  assert.equal(wrongService.code, 1);
+  assert.equal(JSON.parse(await readFile(storePath, "utf8")).tokens.length, 1);
+});
+
+test("chat credential creation writes owner-only plaintext and verifier files without logging secrets", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "lazyedge-chat-credentials-"));
+  const credentialsPath = path.join(directory, "owner.json");
+  const hashPath = path.join(directory, "password.hash");
+  const created = await invoke([
+    "chat", "create-credentials",
+    "--username", "operator",
+    "--credentials-out", credentialsPath,
+    "--hash-out", hashPath,
+  ]);
+  assert.equal(created.code, 0, created.stderr);
+  const credentials = JSON.parse(await readFile(credentialsPath, "utf8"));
+  const passwordHash = (await readFile(hashPath, "utf8")).trim();
+  assert.deepEqual({ version: credentials.version, username: credentials.username }, {
+    version: 1,
+    username: "operator",
+  });
+  assert.match(credentials.password, /^[A-Za-z0-9_-]{43}$/u);
+  assert.equal(created.stdout.includes(credentials.password), false);
+  assert.equal(created.stderr.includes(credentials.password), false);
+  assert.equal((await stat(credentialsPath)).mode & 0o777, 0o600);
+  assert.equal((await stat(hashPath)).mode & 0o777, 0o600);
+  const { verifyChatPassword } = await import("../src/chat-server.js");
+  assert.equal(await verifyChatPassword(credentials.password, passwordHash), true);
+
+  const repeated = await invoke([
+    "chat", "create-credentials",
+    "--username", "operator",
+    "--credentials-out", credentialsPath,
+    "--hash-out", hashPath,
+  ]);
+  assert.equal(repeated.code, 1);
+  assert.equal(JSON.parse(await readFile(credentialsPath, "utf8")).password, credentials.password);
+
+  const passwordInput = path.join(directory, "password.input");
+  const separateHashPath = path.join(directory, "separate-password.hash");
+  const generatedPassword = randomPasswordForTest();
+  await writeFile(passwordInput, `${generatedPassword}\n`, { mode: 0o600 });
+  const hashed = await invoke([
+    "chat", "hash-password",
+    "--password-file", passwordInput,
+    "--out", separateHashPath,
+  ]);
+  assert.equal(hashed.code, 0, hashed.stderr);
+  assert.equal(hashed.stdout.includes(generatedPassword), false);
+  assert.equal(
+    await verifyChatPassword(
+      generatedPassword,
+      (await readFile(separateHashPath, "utf8")).trim(),
+    ),
+    true,
+  );
+});
+
+function randomPasswordForTest() {
+  return randomBytes(32).toString("base64url");
+}
 
 test("secret generation writes only to a private file", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "lazyedge-secret-"));

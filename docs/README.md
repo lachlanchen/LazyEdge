@@ -8,6 +8,7 @@ Start with the [quickstart](quickstart.md), then read the [architecture](archite
 | [Configuration](configuration.md) | Understand the manifest and secret stores |
 | [Architecture](architecture.md) | Follow a request from the public edge to a private worker |
 | [Security](security.md) | Threat model, invariants, credentials, and limitations |
+| [Private chat](private-chat.md) | Optional ChatGPT-style LocalLLM UI, credentials, and overlay upgrade |
 | [Operations](operations.md) | Install, observe, rotate, update, and roll back |
 | [Migration](migration.md) | Move or duplicate an edge without moving private compute |
 | [LocalLLM + AgInTi](integrations/local-llm-aginti.md) | Keep models local while agents use a stable HTTPS endpoint |

@@ -1,3 +1,6 @@
+# Existing deployments: copy the exact primary manifest, add only `chat`, and
+# keep this overlay at /etc/lazyedge-chat/lazyedge.yaml. Never use the changed
+# digest to replace existing edge/redirect/NAT ownership implicitly.
 apiVersion: lazyedge.lazying.art/v1alpha1
 kind: EdgeProject
 
@@ -8,6 +11,7 @@ spec:
   edge:
     gatewayListen: 127.0.0.1:17600
     compatibilityListen: 127.0.0.1:18080
+    compatibilityService: local-llm
     httpPort: 10080
     httpsPort: 10443
     existingSites:
@@ -24,25 +28,22 @@ spec:
   services:
     - id: local-llm
       profile: localllm-openai
-      domains:
-        - llm.example.com
+      domains: [llm.example.com]
       edge:
         upstream: http://127.0.0.1:18008
       worker:
         listen: 127.0.0.1:17800
         target: http://127.0.0.1:8008
         healthPath: /healthz
-      # Optional private browser chat. On an existing digest-owned deployment,
-      # add this only to a separate /etc/lazyedge-chat/lazyedge.yaml overlay;
-      # never replace the primary manifest or re-render NAT implicitly.
-      # chat:
-      #   listen: 127.0.0.1:17610
-      #   username: operator
-      #   defaultModel: deep
-      #   models:
-      #     deep: localllm-deep
-      #     fast: localllm-fast
-      #     code: localllm-code
+      chat:
+        listen: 127.0.0.1:17610
+        username: operator
+        defaultModel: deep
+        maxBodyBytes: 262144
+        models:
+          deep: localllm-deep
+          fast: localllm-fast
+          code: localllm-code
       public:
         tokenSet: local-llm-users
         maxBodyBytes: 33554432

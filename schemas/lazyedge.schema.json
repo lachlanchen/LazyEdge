@@ -145,6 +145,44 @@
         "profile": {
           "enum": ["generic-http", "localllm-openai"]
         },
+        "chat": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["username"],
+          "properties": {
+            "listen": { "$ref": "#/$defs/listen" },
+            "username": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._@+-]{0,63}$"
+            },
+            "maxBodyBytes": {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 2097152
+            },
+            "models": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "deep": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                },
+                "fast": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                },
+                "code": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                }
+              }
+            },
+            "defaultModel": {
+              "enum": ["deep", "fast", "code"]
+            }
+          }
+        },
         "edge": {
           "type": "object",
           "additionalProperties": false,

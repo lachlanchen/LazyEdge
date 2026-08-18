@@ -103,11 +103,26 @@ function certificateFor(host, manualCertificates) {
   };
 }
 
-function renderReverseProxy(upstream, { tlsServerName } = {}, indent = "    ") {
+function renderReverseProxy(upstream, {
+  tlsServerName,
+  dropHeaders = [],
+  clientAddressHeader = false,
+} = {}, indent = "    ") {
   const lines = [
     `${indent}reverse_proxy ${upstream} {`,
     `${indent}    header_up Host {host}`,
   ];
+  for (const header of dropHeaders) {
+    if (!/^[A-Za-z][A-Za-z0-9-]{0,62}$/u.test(header)) {
+      throw new SecurityError("Dropped proxy header name is invalid");
+    }
+    lines.push(`${indent}    header_up -${header}`);
+  }
+  if (clientAddressHeader) {
+    // The chat BFF is loopback-only and trusts this value solely because Caddy
+    // overwrites any client-supplied header at the ingress boundary.
+    lines.push(`${indent}    header_up X-LazyEdge-Client-Address {remote_host}`);
+  }
   if (tlsServerName !== undefined) {
     lines.push(
       `${indent}    transport http {`,
@@ -153,20 +168,65 @@ function renderLandingRoute(indent = "    ") {
   ].join("\n");
 }
 
+function renderChatRoutes(listener, indent = "    ") {
+  const upstream = `http://${exactLoopback(listener, "chat listener")}`;
+  return [
+    `${indent}@lazyedge_chat_document {`,
+    `${indent}    method GET HEAD`,
+    `${indent}    path / /assets/app.css /assets/app.js`,
+    `${indent}}`,
+    `${indent}handle @lazyedge_chat_document {`,
+    renderReverseProxy(
+      upstream,
+      { dropHeaders: ["Authorization"], clientAddressHeader: true },
+      `${indent}    `,
+    ),
+    `${indent}}`,
+    `${indent}@lazyedge_chat_read {`,
+    `${indent}    method GET`,
+    `${indent}    path /chat/api/session /chat/api/models`,
+    `${indent}}`,
+    `${indent}handle @lazyedge_chat_read {`,
+    renderReverseProxy(
+      upstream,
+      { dropHeaders: ["Authorization"], clientAddressHeader: true },
+      `${indent}    `,
+    ),
+    `${indent}}`,
+    `${indent}@lazyedge_chat_write {`,
+    `${indent}    method POST`,
+    `${indent}    path /chat/api/login /chat/api/logout /chat/api/completions`,
+    `${indent}}`,
+    `${indent}handle @lazyedge_chat_write {`,
+    renderReverseProxy(
+      upstream,
+      { dropHeaders: ["Authorization"], clientAddressHeader: true },
+      `${indent}    `,
+    ),
+    `${indent}}`,
+  ].join("\n");
+}
+
 function renderSite(host, upstream, {
   tlsServerName,
   certificate,
   acmeWebroot,
   landing = false,
+  chat,
+  managed = false,
 } = {}) {
   if (certificate === undefined) {
-    if (landing) {
+    if (landing || chat !== undefined) {
       return [
         `${host} {`,
         "    import lazyedge_common",
-        renderLandingRoute(),
+        ...(chat === undefined ? [renderLandingRoute()] : [renderChatRoutes(chat.listen)]),
         "    handle {",
-        renderReverseProxy(upstream, { tlsServerName }, "        "),
+        renderReverseProxy(
+          upstream,
+          { tlsServerName, dropHeaders: managed ? ["Cookie"] : [] },
+          "        ",
+        ),
         "    }",
         "}",
         "",
@@ -175,7 +235,10 @@ function renderSite(host, upstream, {
     return [
       `${host} {`,
       "    import lazyedge_common",
-      renderReverseProxy(upstream, { tlsServerName }),
+      renderReverseProxy(upstream, {
+        tlsServerName,
+        dropHeaders: managed ? ["Cookie"] : [],
+      }),
       "}",
       "",
     ].join("\n");
@@ -199,9 +262,15 @@ function renderSite(host, upstream, {
     `        root * ${webroot}`,
     "        file_server",
     "    }",
-    ...(landing ? [renderLandingRoute()] : []),
+    ...(chat === undefined
+      ? (landing ? [renderLandingRoute()] : [])
+      : [renderChatRoutes(chat.listen)]),
     "    handle {",
-    renderReverseProxy(upstream, { tlsServerName }, "        "),
+    renderReverseProxy(
+      upstream,
+      { tlsServerName, dropHeaders: managed ? ["Cookie"] : [] },
+      "        ",
+    ),
     "    }",
     "}",
     "",
@@ -224,8 +293,14 @@ export function renderCaddy(input, {
   const managedSites = new Map();
   for (const service of manifest.spec.services) {
     for (const host of service.domains) {
-      const current = managedSites.get(host) ?? { landing: false };
+      const current = managedSites.get(host) ?? { landing: false, chat: undefined };
       if (service.profile === LOCALLLM_OPENAI_PROFILE) current.landing = true;
+      if (service.chat !== undefined) {
+        if (current.chat !== undefined) {
+          throw new SecurityError(`More than one private chat claims host ${host}`);
+        }
+        current.chat = service.chat;
+      }
       managedSites.set(host, current);
     }
   }
@@ -269,6 +344,8 @@ export function renderCaddy(input, {
       certificate: certificateFor(host, manualCertificates),
       acmeWebroot,
       landing: managedSites.get(host).landing,
+      chat: managedSites.get(host).chat,
+      managed: true,
     },
   )).join("");
   const rendered = `${header}${preserved}${managed}`;

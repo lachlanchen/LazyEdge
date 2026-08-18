@@ -33,7 +33,7 @@ For a LocalLLM/OpenAI-compatible service, use `profile: localllm-openai`. That p
 
 Its health path is private and must not overlap `/v1/`. Use `generic-http` for another HTTP API and enumerate every allowed path and method exactly; wildcards remain forbidden.
 
-On a managed `localllm-openai` hostname, Caddy serves a small static information page for exact `GET /` and `HEAD /` requests. The page has no scripts or external assets and is never forwarded to the private worker. The configured `/v1` routes still pass through the authenticated, default-deny gateway; LocalLLM Studio, `/api`, and other management routes are not published.
+On a managed `localllm-openai` hostname, Caddy normally serves a small static information page for exact `GET /` and `HEAD /` requests. If the optional [private chat](private-chat.md) is configured, those exact browser routes instead reach a dedicated loopback chat BFF. In both cases, `/v1` remains the authenticated default-deny API path; LocalLLM Studio, `/api`, Ollama, and other management routes are not published.
 
 ## 2. Create role-specific secret stores outside the project
 
@@ -136,12 +136,17 @@ npx @lazyingart/lazyedge render caddy \
 
 The public-key file must contain the dedicated worker tunnel's Ed25519 public key and must not be group/world writable. The identity path is the matching private key on the worker; only the path enters rendered SSH configuration, never the key contents. Build `known_hosts` after verifying the edge host key through an independent channel.
 
-Without `--component`, `render systemd` emits a labeled multi-section review bundle. Use `--component edge`, `worker`, `tunnel`, `caddy`, `redirect`, or `certbot` to render one section at a time after the complete bundle has been reviewed. The root-only `redirect` component is a manual persistence artifact for an already reviewed port cutover; rendering it neither changes nor authorizes firewall state.
+Without `--component`, `render systemd` emits a labeled multi-section review bundle. Use `--component edge`, `worker`, `tunnel`, `caddy`, `redirect`, `certbot`, or optional `chat` to render one section at a time after the complete bundle has been reviewed. The root-only `redirect` component is a manual persistence artifact for an already reviewed port cutover; rendering it neither changes nor authorizes firewall state.
 
 Generated units do not install the CLI. Install the reviewed package first and render each unit with the executable, manifest, bindings, and Node.js paths that will actually exist on that host. A user-prefix/NVM worker can use this pattern:
 
 ```bash
-npm install --global --prefix "$HOME/.local" @lazyingart/lazyedge@0.1.0
+LAZYEDGE_VERSION=$(npm view @lazyingart/lazyedge version)
+case "$LAZYEDGE_VERSION" in
+  ''|*[!0-9.]*) echo "Unexpected LazyEdge version" >&2; exit 1 ;;
+esac
+npm install --global --prefix "$HOME/.local" \
+  "@lazyingart/lazyedge@$LAZYEDGE_VERSION"
 LAZYEDGE_NODE_BIN=$(dirname "$(command -v node)")
 
 "$HOME/.local/bin/lazyedge" render systemd \
@@ -161,6 +166,10 @@ LAZYEDGE_NODE_BIN=$(dirname "$(command -v node)")
   --ssh-alias lazyedge-edge \
   --worker-unit lazyedge-worker.service
 ```
+
+This resolves `latest` once and installs that exact version. Record the version
+and package integrity in the deployment revision; upgrades must resolve and
+review a new immutable version rather than silently tracking a moving tag.
 
 The worker's `--runtime-path` must contain the exact Node.js 20+ binary directory used by the CLI. `--after-unit` expresses a reviewed local-upstream dependency; omit it when no matching user unit exists. Edge installations normally pin the verified CLI at `/usr/local/bin/lazyedge`, but may use the same `--executable`, `--manifest-path`, `--bindings-path`, `--environment-file`, and `--runtime-path` options with `--component edge`. These flags write only unit text; they do not install packages or units.
 

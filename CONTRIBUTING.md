@@ -33,6 +33,14 @@ npm run publish:npm:current
 
 Recovery refuses a dirty tree, a non-`main` branch, a mismatched package lock, a tag that does not point at `HEAD`, or a `HEAD` subject other than the exact release message. If npm already contains that version, recovery skips republishing and continues exact install verification and the pending push.
 
+This local helper is the canonical release path unless the maintainers have
+explicitly configured npm trusted publishing for this repository. Manual
+dispatch of `.github/workflows/publish.yml` validates only and can never
+publish. A stable GitHub Release may publish through trusted OIDC only when its
+tag, commit, package lock, and `CITATION.cff` all match and the version is still
+unpublished. Never publish a GitHub Release for a version already sent by the
+local helper; that workflow will fail closed rather than republish it.
+
 ## Packed CLI and user services
 
 A prefix install places the executable below that exact prefix; generated units do not discover or guess it. The CLI uses `#!/usr/bin/env node`, so a systemd unit must also receive a `PATH` containing the Node.js 20+ installation. For an NVM-backed user install, render the worker with concrete paths and its upstream dependency:

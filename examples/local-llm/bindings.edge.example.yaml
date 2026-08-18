@@ -1,5 +1,7 @@
 # Copy only this edge binding to the public gateway.
 # The referenced files must be regular, private files; no upstream model key belongs here.
+# Optional chat credentials are delivered to the separate lazyedge-chat account
+# with systemd LoadCredential; they do not belong in the edge bindings.
 bindings:
   local-llm:
     relaySecretFile: /etc/lazyedge/secrets/local-llm-relay

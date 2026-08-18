@@ -1,54 +1,54 @@
-name: Publish npm package
+name: Validate or publish npm package
 
 on:
   release:
     types: [published]
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: Validate the package without publishing
-        required: true
-        type: boolean
-        default: true
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
-  group: npm-publish-${{ github.ref }}
+  group: npm-publish-${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
   cancel-in-progress: false
 
 jobs:
-  publish:
+  verify:
+    name: Verify package
     runs-on: ubuntu-latest
-    environment: npm
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
           cache: npm
-      - name: Use an npm release with OIDC trusted publishing
+      - name: Use an npm release compatible with OIDC trusted publishing
         run: |
-          npm install --global npm@^11.5.1
+          npm install --global npm@^11.10.0
           npm --version
+      - name: Reject GitHub pre-releases
+        if: github.event_name == 'release' && github.event.release.prerelease
+        run: |
+          echo "::error::Publish a stable GitHub release for a stable npm version."
+          exit 1
+      - name: Verify package, lock, citation, and release tag
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
+        run: |
+          if [ -n "$RELEASE_TAG" ]; then
+            node scripts/verify-release-metadata.mjs --tag "$RELEASE_TAG"
+          else
+            node scripts/verify-release-metadata.mjs
+          fi
       - run: npm ci
       - run: npm test
       - run: npm run check
-      - name: Verify release tag matches package version
-        if: github.event_name == 'release'
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          node --input-type=module -e '
-            import { readFile } from "node:fs/promises";
-            const pkg = JSON.parse(await readFile("package.json", "utf8"));
-            if (process.env.RELEASE_TAG !== `v${pkg.version}`) {
-              throw new Error(`Release tag ${process.env.RELEASE_TAG} does not match v${pkg.version}`);
-            }
-          '
       - name: Audit npm package contents
         shell: bash
         run: |
@@ -67,6 +67,45 @@ jobs:
           if (forbidden.length > 0) throw new Error(`Forbidden package files:\n${forbidden.join("\n")}`);
           process.stdout.write(`Audited ${files.length} package files.\n`);
           NODE
+      - name: Require an unpublished npm version
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: >-
+          node scripts/verify-release-metadata.mjs
+          --tag "$RELEASE_TAG"
+          --require-unpublished
+
+  publish:
+    name: Publish trusted release
+    if: github.event_name == 'release' && github.event.release.prerelease == false
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Use an npm release compatible with OIDC trusted publishing
+        run: npm install --global npm@^11.10.0
+      - name: Recheck immutable release metadata
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: node scripts/verify-release-metadata.mjs --tag "$RELEASE_TAG"
+      - name: Recheck that the npm version is unpublished
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: >-
+          node scripts/verify-release-metadata.mjs
+          --tag "$RELEASE_TAG"
+          --require-unpublished
       - name: Publish with npm trusted publishing
-        if: github.event_name == 'release' || inputs.dry_run == false
         run: npm publish --access public --provenance

@@ -21,6 +21,8 @@ export const LOCALLLM_OPENAI_PROFILE = "localllm-openai";
 const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
 const DEFAULT_MAX_CONCURRENT_REQUESTS = 4;
 const DEFAULT_IDLE_TIMEOUT_SECONDS = 900;
+const DEFAULT_CHAT_MAX_BODY_BYTES = 256 * 1024;
+const DEFAULT_CHAT_LISTEN = "127.0.0.1:17610";
 const LOCALLLM_ROUTE_METHODS = new Map([
   ["/v1/models", new Set(["GET"])],
   ["/v1/chat/completions", new Set(["POST"])],
@@ -71,6 +73,16 @@ function optionalPort(value, label, fallback, { minimum = 1 } = {}) {
 function optionalLimit(value, label, fallback, maximum) {
   const actual = value === undefined ? fallback : value;
   if (!Number.isSafeInteger(actual) || actual < 1 || actual > maximum) {
+    throw new SecurityError(`${label} is outside its safe range`, {
+      code: "INVALID_MANIFEST",
+    });
+  }
+  return actual;
+}
+
+function optionalRange(value, label, fallback, minimum, maximum) {
+  const actual = value === undefined ? fallback : value;
+  if (!Number.isSafeInteger(actual) || actual < minimum || actual > maximum) {
     throw new SecurityError(`${label} is outside its safe range`, {
       code: "INVALID_MANIFEST",
     });
@@ -166,7 +178,7 @@ function normalizeRoute(route, serviceLabel, profile) {
 function normalizeService(service, index) {
   const label = `spec.services[${index}]`;
   const source = object(service, label);
-  keys(source, ["id", "profile", "domains", "edge", "worker", "public"], label);
+  keys(source, ["id", "profile", "domains", "edge", "worker", "public", "chat"], label);
   const id = requiredString(source.id, `${label}.id`, /^[a-z][a-z0-9-]{0,62}$/u, 63);
   const profile = source.profile === undefined
     ? undefined
@@ -271,6 +283,79 @@ function normalizeService(service, index) {
     },
   };
   if (profile !== undefined) normalized.profile = profile;
+  if (source.chat !== undefined) {
+    if (profile !== LOCALLLM_OPENAI_PROFILE) {
+      throw new SecurityError(`${label}.chat requires profile ${LOCALLLM_OPENAI_PROFILE}`, {
+        code: "PROFILE_POLICY",
+      });
+    }
+    if (domains.length !== 1) {
+      throw new SecurityError(`${label}.chat requires exactly one public domain`, {
+        code: "PROFILE_POLICY",
+      });
+    }
+    const chatSource = object(source.chat, `${label}.chat`);
+    keys(
+      chatSource,
+      ["listen", "username", "maxBodyBytes", "models", "defaultModel"],
+      `${label}.chat`,
+    );
+    const requiredClaims = new Set([
+      "GET\u0000/v1/models",
+      "POST\u0000/v1/chat/completions",
+    ]);
+    for (const route of normalized.public.routes) {
+      for (const method of route.methods) requiredClaims.delete(`${method}\u0000${route.path}`);
+    }
+    if (requiredClaims.size > 0) {
+      throw new SecurityError(
+        `${label}.chat requires GET /v1/models and POST /v1/chat/completions`,
+        { code: "PROFILE_POLICY" },
+      );
+    }
+    const modelSource = chatSource.models === undefined
+      ? {}
+      : object(chatSource.models, `${label}.chat.models`);
+    keys(modelSource, ["deep", "fast", "code"], `${label}.chat.models`);
+    const modelAlias = (value, modelLabel, fallback) => requiredString(
+      value ?? fallback,
+      `${label}.chat.models.${modelLabel}`,
+      /^[a-z][a-z0-9-]{0,62}$/u,
+      63,
+    );
+    const models = {
+      deep: modelAlias(modelSource.deep, "deep", "localllm-deep"),
+      fast: modelAlias(modelSource.fast, "fast", "localllm-fast"),
+      code: modelAlias(modelSource.code, "code", "localllm-code"),
+    };
+    const defaultModel = chatSource.defaultModel ?? "deep";
+    if (!Object.hasOwn(models, defaultModel)) {
+      throw new SecurityError(`${label}.chat.defaultModel must be deep, fast, or code`, {
+        code: "INVALID_MANIFEST",
+      });
+    }
+    normalized.chat = {
+      listen: normalizeManifestListener(
+        chatSource.listen ?? DEFAULT_CHAT_LISTEN,
+        `${label}.chat.listen`,
+      ),
+      username: requiredString(
+        chatSource.username,
+        `${label}.chat.username`,
+        /^[A-Za-z0-9][A-Za-z0-9._@+-]{0,63}$/u,
+        64,
+      ),
+      maxBodyBytes: optionalRange(
+        chatSource.maxBodyBytes,
+        `${label}.chat.maxBodyBytes`,
+        DEFAULT_CHAT_MAX_BODY_BYTES,
+        1024,
+        2 * 1024 * 1024,
+      ),
+      models,
+      defaultModel,
+    };
+  }
   return normalized;
 }
 
@@ -424,6 +509,7 @@ export function normalizeManifest(input) {
   const serviceIds = new Set();
   const workerListeners = new Set();
   const edgeUpstreams = new Set();
+  const chatDomains = new Set();
   const publicClaims = new Set();
   for (const service of services) {
     if (serviceIds.has(service.id)) {
@@ -444,6 +530,16 @@ export function normalizeManifest(input) {
       });
     }
     edgeUpstreams.add(service.edge.upstream);
+    if (service.chat !== undefined) {
+      for (const domain of service.domains) {
+        if (chatDomains.has(domain)) {
+          throw new SecurityError(`Duplicate private chat host: ${domain}`, {
+            code: "DUPLICATE_CLAIM",
+          });
+        }
+        chatDomains.add(domain);
+      }
+    }
     for (const domain of service.domains) {
       for (const route of service.public.routes) {
         for (const method of route.methods) {
@@ -483,6 +579,24 @@ export function normalizeManifest(input) {
     }
     edge.compatibilityService = selected;
   }
+  const chatServices = services.filter((service) => service.chat !== undefined);
+  if (chatServices.length > 1) {
+    throw new SecurityError("Version 0.1 supports one private chat service per edge", {
+      code: "INVALID_MANIFEST",
+    });
+  }
+  if (chatServices.length === 1) {
+    if (edge.compatibilityListen === undefined) {
+      throw new SecurityError("Private chat requires spec.edge.compatibilityListen", {
+        code: "INVALID_MANIFEST",
+      });
+    }
+    if (edge.compatibilityService !== chatServices[0].id) {
+      throw new SecurityError("Private chat must use spec.edge.compatibilityService", {
+        code: "INVALID_MANIFEST",
+      });
+    }
+  }
   const serviceDomains = new Set(services.flatMap((service) => service.domains));
   for (const site of edge.existingSites ?? []) {
     if (serviceDomains.has(site.host)) {
@@ -512,6 +626,9 @@ export function normalizeManifest(input) {
   claimEdgePort(transport.sshPort ?? 22, "spec.transport.sshPort");
   for (const service of services) {
     claimEdgePort(urlPort(service.edge.upstream), `${service.id}.edge.upstream`);
+    if (service.chat !== undefined) {
+      claimEdgePort(listenerPort(service.chat.listen), `${service.id}.chat.listen`);
+    }
   }
   for (const site of edge.existingSites ?? []) {
     const port = urlPort(site.upstream);

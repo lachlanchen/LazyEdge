@@ -101,8 +101,11 @@ The renderer must preserve strict host-key verification, request failure when a 
 | `public.maxBodyBytes` | 1 byte–1 GiB request limit |
 | `public.maxConcurrentRequests` | 1–1024 admitted requests; choose a measured, small value |
 | `public.idleTimeoutSeconds` | 1–86400 seconds; align with proxy/client/upstream timeouts |
+| `chat` | optional private browser-chat BFF; allowed only for `localllm-openai` |
 
 The profile may be omitted, which behaves as `generic-http`. The `localllm-openai` profile permits only a chosen subset of the four reviewed OpenAI-compatible routes shown above. It deliberately keeps health private. `generic-http` remains exact-path only and is intended for reviewed APIs such as Whisper or SoVITS—not arbitrary TCP forwarding.
+
+An optional `chat` block requires exactly one public domain, requires this service to own `spec.edge.compatibilityListen`, and requires `GET /v1/models` plus `POST /v1/chat/completions`. It accepts exact-loopback `listen` (default `127.0.0.1:17610`), a non-secret `username`, a 1 KiB–2 MiB browser body cap, `defaultModel` (`deep`, `fast`, or `code`), and stable alias targets under `models.deep`, `models.fast`, and `models.code`. See [private chat](private-chat.md). A chat overlay for an existing live edge has a different manifest digest and must not replace the primary digest-owned manifest.
 
 ## Bindings and secrets
 
