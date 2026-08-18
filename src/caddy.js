@@ -1,4 +1,8 @@
-import { manifestDigest, normalizeManifest } from "./config.js";
+import {
+  LOCALLLM_OPENAI_PROFILE,
+  manifestDigest,
+  normalizeManifest,
+} from "./config.js";
 import {
   normalizeDomain,
   normalizeLoopbackListener,
@@ -115,12 +119,59 @@ function renderReverseProxy(upstream, { tlsServerName } = {}, indent = "    ") {
   return lines.join("\n");
 }
 
+const LOCALLLM_LANDING_HTML = [
+  "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">",
+  "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">",
+  "<title>LazyEdge API</title></head>",
+  "<body style=\"margin:0;min-height:100vh;display:grid;place-items:center;background:#07111f;color:#e5eefb;font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif\">",
+  "<main style=\"box-sizing:border-box;width:min(92vw,720px);padding:48px;border:1px solid #263b57;border-radius:24px;background:#0d1b2e;box-shadow:0 24px 80px #0008\">",
+  "<div style=\"display:inline-block;padding:6px 10px;border-radius:999px;background:#12395a;color:#8fd3ff;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase\">LazyEdge</div>",
+  "<h1 style=\"margin:22px 0 12px;font-size:clamp(34px,7vw,58px);line-height:1.05;letter-spacing:-.04em\">OpenAI-compatible API</h1>",
+  "<p style=\"margin:0;color:#a9bad1;font-size:18px;line-height:1.65\">This host provides an authenticated private-compute API through a default-deny gateway.</p>",
+  "<div style=\"margin:30px 0;padding:18px 20px;border-radius:14px;background:#081424;border:1px solid #1d3550\"><span style=\"color:#7f96b2\">Client base path</span><code style=\"float:right;color:#b9ecff;font-size:16px\">/v1</code></div>",
+  "<p style=\"margin:0;color:#8fa3bc;line-height:1.6\">Use an authorized client and only the routes configured by the operator. LocalLLM Studio and management routes are not published here.</p>",
+  "<footer style=\"margin-top:34px;padding-top:20px;border-top:1px solid #21344c;color:#647b96;font-size:13px\">API endpoint · No browser console is exposed</footer>",
+  "</main></body></html>",
+].join("");
+
+function renderLandingRoute(indent = "    ") {
+  return [
+    `${indent}@lazyedge_landing {`,
+    `${indent}    method GET HEAD`,
+    `${indent}    path /`,
+    `${indent}}`,
+    `${indent}handle @lazyedge_landing {`,
+    `${indent}    header {`,
+    `${indent}        Cache-Control \"no-store\"`,
+    `${indent}        Content-Security-Policy \"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'\"`,
+    `${indent}        Content-Type \"text/html; charset=utf-8\"`,
+    `${indent}        Referrer-Policy \"no-referrer\"`,
+    `${indent}        X-Content-Type-Options \"nosniff\"`,
+    `${indent}    }`,
+    `${indent}    respond ${JSON.stringify(LOCALLLM_LANDING_HTML)} 200`,
+    `${indent}}`,
+  ].join("\n");
+}
+
 function renderSite(host, upstream, {
   tlsServerName,
   certificate,
   acmeWebroot,
+  landing = false,
 } = {}) {
   if (certificate === undefined) {
+    if (landing) {
+      return [
+        `${host} {`,
+        "    import lazyedge_common",
+        renderLandingRoute(),
+        "    handle {",
+        renderReverseProxy(upstream, { tlsServerName }, "        "),
+        "    }",
+        "}",
+        "",
+      ].join("\n");
+    }
     return [
       `${host} {`,
       "    import lazyedge_common",
@@ -148,6 +199,7 @@ function renderSite(host, upstream, {
     `        root * ${webroot}`,
     "        file_server",
     "    }",
+    ...(landing ? [renderLandingRoute()] : []),
     "    handle {",
     renderReverseProxy(upstream, { tlsServerName }, "        "),
     "    }",
@@ -169,9 +221,15 @@ export function renderCaddy(input, {
   const gateway = exactLoopback(manifest.spec.edge.gatewayListen, "spec.edge.gatewayListen");
   const existingSites = normalizeExistingSites(manifest);
   const existingHosts = new Set(existingSites.map((site) => site.host));
-  const managedHosts = [...new Set(
-    manifest.spec.services.flatMap((service) => service.domains),
-  )].sort();
+  const managedSites = new Map();
+  for (const service of manifest.spec.services) {
+    for (const host of service.domains) {
+      const current = managedSites.get(host) ?? { landing: false };
+      if (service.profile === LOCALLLM_OPENAI_PROFILE) current.landing = true;
+      managedSites.set(host, current);
+    }
+  }
+  const managedHosts = [...managedSites.keys()].sort();
   for (const host of managedHosts) {
     if (existingHosts.has(host)) {
       throw new SecurityError(`Host cannot be both preserved and managed: ${host}`);
@@ -210,6 +268,7 @@ export function renderCaddy(input, {
     {
       certificate: certificateFor(host, manualCertificates),
       acmeWebroot,
+      landing: managedSites.get(host).landing,
     },
   )).join("");
   const rendered = `${header}${preserved}${managed}`;

@@ -58,6 +58,45 @@ test("Caddy renderer preserves an existing TLS upstream and isolates managed hos
   assert.doesNotMatch(caddy, /0\.0\.0\.0|\*\.|:\*/u);
 });
 
+test("Caddy renders an exact-root landing page only for LocalLLM API hosts", () => {
+  const caddy = renderCaddy(fixture, { manualCertificates: true });
+  const managedHttpStart = caddy.indexOf("http://llm.example.net {");
+  const managedHttpsStart = caddy.indexOf("https://llm.example.net {");
+  assert.notEqual(managedHttpStart, -1);
+  assert.notEqual(managedHttpsStart, -1);
+
+  const sitesBeforeManaged = caddy.slice(0, managedHttpStart);
+  const managedHttp = caddy.slice(managedHttpStart, managedHttpsStart);
+  const managedHttps = caddy.slice(managedHttpsStart);
+  assert.doesNotMatch(sitesBeforeManaged, /@lazyedge_landing/u);
+  assert.doesNotMatch(managedHttp, /@lazyedge_landing/u);
+  assert.match(managedHttp, /redir https:\/\/\{host\}\{uri\} 308/u);
+  assert.match(
+    managedHttps,
+    /@lazyedge_landing \{\n        method GET HEAD\n        path \/\n    \}/u,
+  );
+  assert.match(managedHttps, /handle @lazyedge_landing/u);
+  assert.match(managedHttps, /Content-Type "text\/html; charset=utf-8"/u);
+  assert.match(managedHttps, /Content-Security-Policy "default-src 'none'/u);
+  assert.match(managedHttps, /OpenAI-compatible API/u);
+  assert.match(managedHttps, /Client base path/u);
+  assert.match(managedHttps, />\/v1<\/code>/u);
+  assert.match(managedHttps, /LocalLLM Studio and management routes are not published/u);
+
+  const landingIndex = managedHttps.indexOf("handle @lazyedge_landing");
+  const gatewayIndex = managedHttps.indexOf("reverse_proxy http://127.0.0.1:17600");
+  assert.ok(landingIndex < gatewayIndex);
+  assert.doesNotMatch(caddy, /reverse_proxy http:\/\/127\.0\.0\.1:8008/u);
+  assert.doesNotMatch(caddy, /(?:handle|path) \/api(?:\s|\*)/u);
+
+  const automaticTls = renderCaddy(fixture);
+  assert.match(automaticTls, /llm\.example\.net \{[\s\S]*@lazyedge_landing/u);
+
+  const generic = structuredClone(fixture);
+  generic.spec.services[0].profile = "generic-http";
+  assert.doesNotMatch(renderCaddy(generic), /@lazyedge_landing/u);
+});
+
 test("Caddy renderer refuses privileged ports and unsafe certificate paths", () => {
   const lowPort = structuredClone(fixture);
   lowPort.spec.edge.httpPort = 80;

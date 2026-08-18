@@ -33,6 +33,8 @@ For a LocalLLM/OpenAI-compatible service, use `profile: localllm-openai`. That p
 
 Its health path is private and must not overlap `/v1/`. Use `generic-http` for another HTTP API and enumerate every allowed path and method exactly; wildcards remain forbidden.
 
+On a managed `localllm-openai` hostname, Caddy serves a small static information page for exact `GET /` and `HEAD /` requests. The page has no scripts or external assets and is never forwarded to the private worker. The configured `/v1` routes still pass through the authenticated, default-deny gateway; LocalLLM Studio, `/api`, and other management routes are not published.
+
 ## 2. Create role-specific secret stores outside the project
 
 The manifest names a token set but contains no token value. The public edge and private worker must not share one catch-all bindings file. Copy the [edge template](../examples/local-llm/bindings.edge.example.yaml) only to the gateway and the [worker template](../examples/local-llm/bindings.worker.example.yaml) only to private compute. A typical split is:
