@@ -41,7 +41,7 @@ Usage:
   lazyedge chat issue-client-token --config FILE --service ID --store FILE --out FILE [--days N]
   lazyedge serve edge --config FILE --bindings FILE [--service COMPATIBILITY_ID]
   lazyedge serve worker --config FILE --bindings FILE [--service ID]
-  lazyedge serve chat --config FILE --service ID --password-hash-file FILE --client-token-file FILE
+  lazyedge serve chat --config FILE --service ID --password-hash-file FILE --client-token-file FILE [--remember-session-store FILE --remember-session-secret-file FILE]
   lazyedge doctor [--config lazyedge.yaml] [--role edge|worker|all] [--json]
   lazyedge --version
 
@@ -250,6 +250,8 @@ async function renderCommand(kind, options, stdout) {
       "worker-unit",
       "password-hash-file",
       "client-token-file",
+      "remember-session-store",
+      "remember-session-secret-file",
     ];
     assertOptions(options, ["config", "component", ...pathOptions]);
     const module = await import("./systemd.js");
@@ -287,6 +289,7 @@ async function renderCommand(kind, options, stdout) {
       certbot: new Set(),
       chat: new Set([
         "executable", "manifest-path", "runtime-path", "password-hash-file", "client-token-file",
+        "remember-session-store", "remember-session-secret-file",
       ]),
     };
     if (selected !== undefined) {
@@ -336,6 +339,10 @@ async function renderCommand(kind, options, stdout) {
                 ? {} : { passwordHashPath: stringOption(options, "password-hash-file") }),
               ...(stringOption(options, "client-token-file") === undefined
                 ? {} : { clientTokenPath: stringOption(options, "client-token-file") }),
+              ...(stringOption(options, "remember-session-store") === undefined
+                ? {} : { rememberSessionStorePath: stringOption(options, "remember-session-store") }),
+              ...(stringOption(options, "remember-session-secret-file") === undefined
+                ? {} : { rememberSessionSecretPath: stringOption(options, "remember-session-secret-file") }),
             }
         : {};
     // An executable Certbot hook must begin with its shebang. The labeled
@@ -750,11 +757,14 @@ async function serveCommand(role, options, stdout) {
   if (role === "chat") {
     assertOptions(options, [
       "config", "service", "password-hash-file", "client-token-file",
+      "remember-session-store", "remember-session-secret-file",
     ]);
     const { manifest } = await load(options);
     const serviceId = option(options, "service");
     const passwordHashFile = option(options, "password-hash-file");
     const clientTokenFile = option(options, "client-token-file");
+    const rememberSessionStore = option(options, "remember-session-store");
+    const rememberSessionSecretFile = option(options, "remember-session-secret-file");
     if (
       typeof serviceId !== "string"
       || typeof passwordHashFile !== "string"
@@ -762,6 +772,15 @@ async function serveCommand(role, options, stdout) {
     ) {
       throw new Error(
         "serve chat requires --service, --password-hash-file, and --client-token-file",
+      );
+    }
+    if (
+      (rememberSessionStore === undefined) !== (rememberSessionSecretFile === undefined)
+      || (rememberSessionStore !== undefined && typeof rememberSessionStore !== "string")
+      || (rememberSessionSecretFile !== undefined && typeof rememberSessionSecretFile !== "string")
+    ) {
+      throw new Error(
+        "remembered chat sessions require --remember-session-store and --remember-session-secret-file together",
       );
     }
     const { startChatServer } = await import("./chat-server.js");
@@ -776,6 +795,15 @@ async function serveCommand(role, options, stdout) {
         path.resolve(clientTokenFile),
         `${serviceId} chat client token`,
       ),
+      ...(rememberSessionStore === undefined
+        ? {}
+        : {
+            rememberSessionStorePath: path.resolve(rememberSessionStore),
+            rememberSessionSecret: await readPrivateText(
+              path.resolve(rememberSessionSecretFile),
+              `${serviceId} chat session secret`,
+            ),
+          }),
     });
     try {
       output(stdout, `LazyEdge private chat ${serviceId} listening on ${handle.url}`);

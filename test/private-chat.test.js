@@ -265,7 +265,10 @@ test("private chat manifest is optional, strict, and uses stable model aliases",
 test("Caddy publishes only exact chat routes while preserving the bearer API", () => {
   const caddy = renderCaddy(baseManifest(), { manualCertificates: true });
   assert.match(caddy, /reverse_proxy http:\/\/127\.0\.0\.1:17610/u);
-  assert.match(caddy, /method GET HEAD\n\s+path \/ \/assets\/app\.css \/assets\/app\.js/u);
+  assert.match(
+    caddy,
+    /method GET HEAD\n\s+path \/ \/manifest\.webmanifest \/sw\.js \/assets\/app\.css \/assets\/app\.js \/assets\/markdown\.js \/assets\/katex\.mjs \/assets\/icon-192\.png \/assets\/icon-512\.png/u,
+  );
   assert.match(caddy, /method GET\n\s+path \/chat\/api\/session \/chat\/api\/models/u);
   assert.match(caddy, /method POST\n\s+path \/chat\/api\/login \/chat\/api\/logout \/chat\/api\/completions/u);
   assert.match(caddy, /reverse_proxy http:\/\/127\.0\.0\.1:17610 \{[\s\S]*header_up -Authorization/u);
@@ -1123,8 +1126,14 @@ test("chat systemd unit isolates credentials and the dedicated account", () => {
   assert.match(unit, /^Group=lazyedge-chat$/mu);
   assert.match(unit, /LoadCredential=chat-password-hash:\/etc\/lazyedge-chat\/secrets\/local-llm-chat-password-hash/u);
   assert.match(unit, /LoadCredential=chat-client-token:\/etc\/lazyedge-chat\/secrets\/local-llm-chat-client-token/u);
+  assert.match(unit, /LoadCredential=chat-session-secret:\/etc\/lazyedge-chat\/secrets\/local-llm-chat-session-secret/u);
   assert.match(unit, /serve chat --config \/etc\/lazyedge-chat\/lazyedge.yaml/u);
   assert.match(unit, /--password-hash-file %d\/chat-password-hash/u);
+  assert.match(unit, /--remember-session-store \/var\/lib\/lazyedge-chat\/sessions\.json/u);
+  assert.match(unit, /--remember-session-secret-file %d\/chat-session-secret/u);
+  assert.match(unit, /^StateDirectory=lazyedge-chat$/mu);
+  assert.match(unit, /^StateDirectoryMode=0700$/mu);
+  assert.match(unit, /^ReadWritePaths=\/var\/lib\/lazyedge-chat \/run\/lazyedge-chat$/mu);
   assert.match(unit, /^IPAddressDeny=any$/mu);
   assert.match(unit, /^IPAddressAllow=localhost$/mu);
   assert.match(unit, /^MemoryMax=512M$/mu);

@@ -29,6 +29,12 @@ On the edge, inspect the expected listener. It must be on `127.0.0.1`, not a wil
 
 Common causes are a port already in use, an unauthorized key, a changed host key, `AllowTcpForwarding`/`PermitListen` restrictions, DNS failure, or a supervisor repeatedly starting duplicate tunnels. Do not set `StrictHostKeyChecking=no` as a repair.
 
+The rendered user tunnel retries indefinitely with a 15-second delay. If an
+older unit exhausted systemd's start limit during a long outage, first prove
+that no duplicate SSH process or remote listener exists, then use the user
+manager's `reset-failed` and `start` actions for that exact LazyEdge unit. Do
+not treat repeated bind failure as permission to kill an unknown listener.
+
 ## Guards and credentials
 
 Test one invalid token and one forbidden method deliberately. If either succeeds, stop exposure and inspect the loaded manifest before testing anything else.

@@ -22,7 +22,7 @@ cd my-edge
 npx @lazyingart/lazyedge init --output lazyedge.yaml
 ```
 
-`init` creates one secret-free `lazyedge.yaml`. Open the manifest and replace example hosts and ports. Version 0.1 requires exact IPv4 loopback listeners such as `127.0.0.1:18008`; never use `0.0.0.0`, `::1`, a LAN address, or a raw public target.
+`init` creates one secret-free `lazyedge.yaml`. Open the manifest and replace example hosts and ports. The v0.2 preview requires exact IPv4 loopback listeners such as `127.0.0.1:18008`; never use `0.0.0.0`, `::1`, a LAN address, or a raw public target.
 
 For a LocalLLM/OpenAI-compatible service, use `profile: localllm-openai`. That profile admits only a chosen subset of this reviewed four-route set:
 
@@ -33,7 +33,7 @@ For a LocalLLM/OpenAI-compatible service, use `profile: localllm-openai`. That p
 
 Its health path is private and must not overlap `/v1/`. Use `generic-http` for another HTTP API and enumerate every allowed path and method exactly; wildcards remain forbidden.
 
-On a managed `localllm-openai` hostname, Caddy normally serves a small static information page for exact `GET /` and `HEAD /` requests. If the optional [private chat](private-chat.md) is configured, those exact browser routes instead reach a dedicated loopback chat BFF. In both cases, `/v1` remains the authenticated default-deny API path; LocalLLM Studio, `/api`, Ollama, and other management routes are not published.
+On a managed `localllm-openai` hostname, Caddy normally serves a small static information page for exact `GET /` and `HEAD /` requests. If the optional [private chat](private-chat.md) is configured, the reviewed document, app-shell asset, authentication, model, and HTTP/SSE completion routes instead reach a dedicated loopback chat BFF. Its installable PWA caches only its reviewed public app shell; it never caches chat requests, credentials, conversations, or model responses. In both cases, `/v1` remains the authenticated default-deny API path; LocalLLM Studio, `/api`, Ollama, and other management routes are not published.
 
 ## 2. Create role-specific secret stores outside the project
 
@@ -217,7 +217,7 @@ Use `--role all` only for a deliberately co-located rehearsal where both sets of
 
 ## 5. Deploy deliberately
 
-Version `0.1` does not implement remote `apply`, `rollback`, `uninstall`, or `status`. The render commands write artifacts to standard output for review. Save them to a protected staging directory, validate them with their native tools, and install them manually following [operations](operations.md). The `accounts` output is a bootstrap script: inspect every line and run it only through an authorized administrator session.
+Version `0.2` does not implement remote `apply`, `rollback`, `uninstall`, or `status`. The render commands write artifacts to standard output for review. Save them to a protected staging directory, validate them with their native tools, and install them manually following [operations](operations.md). The `accounts` output is a bootstrap script: inspect every line and run it only through an authorized administrator session.
 
 Never pipe a downloaded script to a shell, never let LazyEdge replace an unrelated site, and never expose a reverse listener on a wildcard address. Keep the previous native configuration as the rollback target.
 

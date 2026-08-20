@@ -7,6 +7,7 @@ export * from "./config.js";
 export * from "./accounts.js";
 export * from "./caddy.js";
 export * from "./chat-server.js";
+export * from "./chat-session-store.js";
 export * from "./doctor.js";
 export * from "./edge-server.js";
 export * from "./http-policy.js";

@@ -33,8 +33,9 @@ flowchart LR
 - **認証情報の分離：** クライアント、リレー、上流、SSH の認証情報は別々で、マニフェスト外に置きます。
 - **交換可能な転送層：** まず OpenSSH を使用し、アプリケーション契約は将来の WireGuard、rathole、frp から分離します。
 - **移行可能なエッジ：** 同じレビュー済みプロジェクトを別のクラウドで生成し、並行接続して検証した後に DNS を移します。
+- **任意のプライベートチャット（v0.2 プレビュー）：** 専用の loopback BFF が、既定で明るい/ダークのインストール可能な PWA、増分テキストストリーミング、任意のログイン保持とブラウザーのパスワードマネージャー対応、安全な Markdown と同一オリジンのオフライン KaTeX を提供します。API トークンと生のモデルルートはサーバー側に残ります。
 
-LazyEdge は ngrok 型リバーストンネルと同じ問題領域を扱いますが、意図的に範囲を限定しています。v0.1 が公開するのはレビュー済み HTTP API ルートであり、任意の TCP ポートやその場限りの公開 URL ではありません。技術の位置付けは[大規模システムの概念](../docs/concepts-at-scale.md)を参照してください。
+LazyEdge は ngrok 型リバーストンネルと同じ問題領域を扱いますが、意図的に範囲を限定しています。v0.2 プレビューが公開するのはレビュー済み HTTP API ルートであり、任意の TCP ポートやその場限りの公開 URL ではありません。技術の位置付けは[大規模システムの概念](../docs/concepts-at-scale.md)を参照してください。
 
 ## クイックスタート
 
@@ -61,13 +62,13 @@ npx @lazyingart/lazyedge render accounts --config ./lazyedge.yaml \
 npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 ```
 
-上の Caddy コマンドは Automatic HTTPS を使用します。既存の Certbot 構成が `/etc/letsencrypt/live/<host>/` にある場合だけ `--manual-certificates` を追加してください。アカウントレンダラーには専用 Ed25519 公開鍵が必要です。OpenSSH のパスはワーカー上の非公開ファイルを指すだけで、内容を複製しません。systemd コマンドは見出し付きレビュー用バンドルを出力し、`--component edge|worker|tunnel|caddy|redirect|certbot` で一つのセクションも選べます。
+上の Caddy コマンドは Automatic HTTPS を使用します。既存の Certbot 構成が `/etc/letsencrypt/live/<host>/` にある場合だけ `--manual-certificates` を追加してください。アカウントレンダラーには専用 Ed25519 公開鍵が必要です。OpenSSH のパスはワーカー上の非公開ファイルを指すだけで、内容を複製しません。systemd コマンドは見出し付きレビュー用バンドルを出力し、`--component edge|worker|tunnel|caddy|redirect|certbot|chat` で一つのセクションも選べます。
 
 バインディングは信頼境界ごとに分離してください。[edge の例](../examples/local-llm/bindings.edge.example.yaml)は公開ゲートウェイだけに、[worker の例](../examples/local-llm/bindings.worker.example.yaml)は非公開計算ホストだけに置きます。各ランタイムは自分の役割に必要な認証情報だけを読み、相手側の認証情報ストアを必要としません。
 
 起動後はクラウドで `doctor --role edge`、非公開計算ホストで `doctor --role worker` を実行し、両ロールが本当に同居する場合だけ `all` を使います。root 用の `render redirect-helper` と `render nat --direction apply|rollback` は、マニフェストダイジェスト由来の所有タグ付きレビュー成果物を出力するだけで、ファイアウォールを変更しません。[運用ガイド](../docs/operations.md)を参照してください。
 
-`v1alpha1` インターフェースはプレビューです。バージョン 0.1 はリモートの `apply`、`rollback`、`uninstall` を提供しません。レンダラーがレビュー可能な成果物を書き出し、管理者が意図的に導入します。[完全なクイックスタート](../docs/quickstart.md)も参照してください。
+`v1alpha1` インターフェースはプレビューです。バージョン 0.2 はリモートの `apply`、`rollback`、`uninstall` を提供しません。レンダラーがレビュー可能な成果物を書き出し、管理者が意図的に導入します。[完全なクイックスタート](../docs/quickstart.md)も参照してください。
 
 ## 収録内容
 
@@ -119,6 +120,6 @@ npm ドライランのファイル一覧を確認してください。リリー�
 
 ## 状態
 
-**v0.1 プレビュー。** 公開インターフェースは変更される可能性があります。このリポジトリは意図する安全な基準を示すものであり、特定のドメイン、クラウドサーバー、トンネル、npm バージョン、LocalLLM 配備が稼働中であるとは、その環境を独立に検証するまで主張しません。機密性の高いシステムや安全上重要なシステムを守る唯一の制御として LazyEdge を使用しないでください。
+**v0.2 プレビュー。** 公開インターフェースは変更される可能性があります。このリポジトリは意図する安全な基準を示すものであり、特定のドメイン、クラウドサーバー、トンネル、npm バージョン、LocalLLM 配備が稼働中であるとは、その環境を独立に検証するまで主張しません。機密性の高いシステムや安全上重要なシステムを守る唯一の制御として LazyEdge を使用しないでください。
 
 MIT © [Lachlan Chen](https://github.com/lachlanchen)

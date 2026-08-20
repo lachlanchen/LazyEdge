@@ -128,6 +128,13 @@ Give each unit:
 
 Only the private worker owns and restarts its tunnel. The edge must not start a second tunnel for the same listener while the first is active.
 
+The tunnel renderer disables systemd's start-rate cutoff and uses a 15-second
+restart delay. This keeps an outbound worker reconnecting after a long network
+or edge outage instead of becoming permanently failed after a short burst.
+OpenSSH's own server-alive and forward-failure checks remain the authority for
+each attempt; an operator must still reconcile an occupied remote listener
+before starting a second connection.
+
 The renderers default to `/usr/local/bin/lazyedge` and the documented role-specific bindings paths. If npm was installed under a user prefix or Node.js comes from NVM, render the worker with explicit `--executable` and `--runtime-path` values and verify both paths from the target user manager. Use `--manifest-path`, `--bindings-path`, and `--environment-file` when the reviewed installation layout differs; use worker `--after-unit SERVICE` for a real local-upstream user unit. Tunnel paths are independently configurable with `--ssh-config-path`, `--ssh-alias`, and `--worker-unit`. Never install a unit whose rendered path exists only in the shell that generated it.
 
 ## Health checks

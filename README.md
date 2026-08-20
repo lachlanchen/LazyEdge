@@ -33,9 +33,9 @@ flowchart LR
 - **Credential separation:** client, relay, upstream, and SSH credentials are different and stay outside the manifest.
 - **Replaceable transport:** OpenSSH first; the application contract remains decoupled from future WireGuard, rathole, or frp transport.
 - **Migratable edge:** render the same reviewed project on a second cloud, connect it in parallel, test, then move DNS.
-- **Optional private chat:** a dedicated loopback BFF adds streamed browser chat with password login while keeping API tokens and raw model routes server-side.
+- **Optional private chat (v0.2 preview):** a dedicated loopback BFF adds an installable bright-by-default/dark PWA with incremental text streaming, opt-in remembered sign-in and browser-password-manager support, plus safe Markdown and same-origin offline KaTeX—while keeping API tokens and raw model routes server-side.
 
-LazyEdge occupies the same problem space as an ngrok-style reverse tunnel, but it is intentionally narrower: v0.1 exposes reviewed HTTP API routes, not arbitrary TCP ports or ad-hoc public URLs. See [concepts at scale](docs/concepts-at-scale.md) for the technology map.
+LazyEdge occupies the same problem space as an ngrok-style reverse tunnel, but it is intentionally narrower: the v0.2 preview exposes reviewed HTTP API routes, not arbitrary TCP ports or ad-hoc public URLs. See [concepts at scale](docs/concepts-at-scale.md) for the technology map.
 
 ## Quickstart
 
@@ -68,7 +68,7 @@ Keep runtime bindings split by trust boundary: copy the [edge example](examples/
 
 After startup, run `doctor --role edge` on the cloud and `doctor --role worker` on private compute; use `all` only when both roles are genuinely co-located. Root-only `render redirect-helper` and `render nat --direction apply|rollback` commands print review artifacts with manifest-digest ownership tags—they never execute a firewall change. See [operations](docs/operations.md).
 
-The `v1alpha1` interface is preview. Version 0.1 does not ship remote `apply`, `rollback`, or `uninstall`: renderers write reviewable artifacts, and an administrator installs them deliberately. See the complete [quickstart](docs/quickstart.md).
+The `v1alpha1` interface is preview. Version 0.2 does not ship remote `apply`, `rollback`, or `uninstall`: renderers write reviewable artifacts, and an administrator installs them deliberately. See the complete [quickstart](docs/quickstart.md).
 
 ## What is included
 
@@ -121,6 +121,6 @@ If you use LazyEdge in research, cite the repository. GitHub reads [CITATION.cff
 
 ## Status
 
-**v0.1 preview.** The public interface may change. This repository describes the intended safe baseline; it does not claim that any particular domain, cloud server, tunnel, npm version, or LocalLLM deployment is live until that environment is independently verified. Do not use LazyEdge as the only control protecting sensitive or safety-critical systems.
+**v0.2 preview.** The public interface may change. This repository describes the intended safe baseline; it does not claim that any particular domain, cloud server, tunnel, npm version, or LocalLLM deployment is live until that environment is independently verified. Do not use LazyEdge as the only control protecting sensitive or safety-critical systems.
 
 MIT © [Lachlan Chen](https://github.com/lachlanchen)

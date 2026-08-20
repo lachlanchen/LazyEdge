@@ -204,6 +204,8 @@ export function renderChatSystemd(input, {
   manifestPath = "/etc/lazyedge-chat/lazyedge.yaml",
   passwordHashPath,
   clientTokenPath,
+  rememberSessionStorePath = "/var/lib/lazyedge-chat/sessions.json",
+  rememberSessionSecretPath,
   pathEnvironment,
   description = "LazyEdge private LocalLLM chat",
 } = {}) {
@@ -224,6 +226,20 @@ export function renderChatSystemd(input, {
     clientTokenPath ?? `/etc/lazyedge-chat/secrets/${service.id}-chat-client-token`,
     "clientTokenPath",
   );
+  const sessionStoreFile = absolutePath(
+    rememberSessionStorePath,
+    "rememberSessionStorePath",
+  );
+  if (!sessionStoreFile.startsWith("/var/lib/lazyedge-chat/")) {
+    throw new SecurityError(
+      "rememberSessionStorePath must be below /var/lib/lazyedge-chat",
+    );
+  }
+  const sessionSecretFile = absolutePath(
+    rememberSessionSecretPath
+      ?? `/etc/lazyedge-chat/secrets/${service.id}-chat-session-secret`,
+    "rememberSessionSecretPath",
+  );
   const executablePath = runtimePath(pathEnvironment);
   return [
     "[Unit]",
@@ -240,14 +256,18 @@ export function renderChatSystemd(input, {
     ...(executablePath === undefined ? [] : [`Environment=PATH=${executablePath}`]),
     `LoadCredential=chat-password-hash:${passwordFile}`,
     `LoadCredential=chat-client-token:${tokenFile}`,
-    `ExecStart=${binary} serve chat --config ${manifestFile} --service ${service.id} --password-hash-file %d/chat-password-hash --client-token-file %d/chat-client-token`,
+    `LoadCredential=chat-session-secret:${sessionSecretFile}`,
+    `ExecStart=${binary} serve chat --config ${manifestFile} --service ${service.id} --password-hash-file %d/chat-password-hash --client-token-file %d/chat-client-token --remember-session-store ${sessionStoreFile} --remember-session-secret-file %d/chat-session-secret`,
     "Restart=on-failure",
     "RestartSec=5s",
     "TimeoutStartSec=30s",
     "TimeoutStopSec=30s",
     "RuntimeDirectory=lazyedge-chat",
     "RuntimeDirectoryMode=0700",
+    "StateDirectory=lazyedge-chat",
+    "StateDirectoryMode=0700",
     "ReadOnlyPaths=/etc/lazyedge-chat",
+    "ReadWritePaths=/var/lib/lazyedge-chat /run/lazyedge-chat",
     "InaccessiblePaths=-/etc/lazyedge -/var/lib/lazyedge -/var/log/lazyedge",
     "IPAddressDeny=any",
     "IPAddressAllow=localhost",
@@ -282,14 +302,17 @@ export function renderTunnelSystemd(input, {
     `Wants=network-online.target ${dependency}`,
     "After=network-online.target",
     `After=${dependency}`,
-    "StartLimitIntervalSec=300",
-    "StartLimitBurst=10",
+    // The worker can remain behind an unavailable network or a stale remote
+    // listener for longer than systemd's default start-limit window.  The
+    // tunnel must keep retrying indefinitely instead of becoming permanently
+    // failed while the private worker is otherwise healthy.
+    "StartLimitIntervalSec=0",
     "",
     "[Service]",
     "Type=simple",
     `ExecStart=/usr/bin/ssh -NT -F ${config} ${sshAlias}`,
     "Restart=always",
-    "RestartSec=5s",
+    "RestartSec=15s",
     "TimeoutStartSec=30s",
     "TimeoutStopSec=15s",
     ...commonHardening({ protectHome: "read-only", systemManager: false }),

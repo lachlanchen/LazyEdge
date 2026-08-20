@@ -33,8 +33,9 @@ flowchart LR
 - **Credenciales separadas:** cliente, relé, servicio ascendente y SSH usan credenciales distintas fuera del manifiesto.
 - **Transporte sustituible:** OpenSSH primero; el contrato de aplicación permanece desacoplado de futuros transportes WireGuard, rathole o frp.
 - **Borde migrable:** genera el mismo proyecto revisado en una segunda nube, conéctalo en paralelo, pruébalo y después mueve DNS.
+- **Chat privado opcional (vista previa v0.2):** un BFF dedicado en loopback ofrece una PWA instalable clara por defecto/oscura, streaming incremental de texto, inicio recordado opcional y compatibilidad con el gestor de contraseñas del navegador, además de Markdown seguro y KaTeX sin conexión del mismo origen; los tokens de API y rutas de modelo sin procesar permanecen en el servidor.
 
-LazyEdge ocupa un espacio parecido al de un túnel inverso estilo ngrok, pero es deliberadamente más estrecho: v0.1 publica rutas HTTP API revisadas, no puertos TCP arbitrarios ni URL públicas improvisadas. Consulta [conceptos a escala](../docs/concepts-at-scale.md) para ver el mapa tecnológico.
+LazyEdge ocupa un espacio parecido al de un túnel inverso estilo ngrok, pero es deliberadamente más estrecho: la vista previa v0.2 publica rutas HTTP API revisadas, no puertos TCP arbitrarios ni URL públicas improvisadas. Consulta [conceptos a escala](../docs/concepts-at-scale.md) para ver el mapa tecnológico.
 
 ## Inicio rápido
 
@@ -61,13 +62,13 @@ npx @lazyingart/lazyedge render accounts --config ./lazyedge.yaml \
 npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 ```
 
-El comando Caddy anterior usa HTTPS automático. Añade `--manual-certificates` solo para un esquema Certbot existente en `/etc/letsencrypt/live/<host>/`. El generador de cuentas requiere una clave pública Ed25519 dedicada; las rutas OpenSSH apuntan a archivos privados del trabajador sin copiar su contenido. El comando systemd produce un paquete de revisión etiquetado o acepta `--component edge|worker|tunnel|caddy|redirect|certbot` para una sola sección.
+El comando Caddy anterior usa HTTPS automático. Añade `--manual-certificates` solo para un esquema Certbot existente en `/etc/letsencrypt/live/<host>/`. El generador de cuentas requiere una clave pública Ed25519 dedicada; las rutas OpenSSH apuntan a archivos privados del trabajador sin copiar su contenido. El comando systemd produce un paquete de revisión etiquetado o acepta `--component edge|worker|tunnel|caddy|redirect|certbot|chat` para una sola sección.
 
 Separa los enlaces por límite de confianza: coloca el [ejemplo del borde](../examples/local-llm/bindings.edge.example.yaml) solo en la puerta de enlace pública y el [ejemplo del trabajador](../examples/local-llm/bindings.worker.example.yaml) solo en el cómputo privado. Cada proceso lee únicamente las credenciales de su función; ninguno necesita el almacén de credenciales del otro.
 
 Tras el arranque, ejecuta `doctor --role edge` en la nube y `doctor --role worker` en el cómputo privado; usa `all` solo si ambos roles comparten realmente el host. Los comandos de root `render redirect-helper` y `render nat --direction apply|rollback` imprimen artefactos de revisión con etiquetas de propiedad derivadas del resumen del manifiesto; nunca ejecutan un cambio de firewall. Consulta [operaciones](../docs/operations.md).
 
-La interfaz `v1alpha1` está en vista previa. La versión 0.1 no incluye `apply`, `rollback` ni `uninstall` remotos: los generadores escriben artefactos revisables y un administrador los instala de forma deliberada. Consulta el [inicio rápido completo](../docs/quickstart.md).
+La interfaz `v1alpha1` está en vista previa. La versión 0.2 no incluye `apply`, `rollback` ni `uninstall` remotos: los generadores escriben artefactos revisables y un administrador los instala de forma deliberada. Consulta el [inicio rápido completo](../docs/quickstart.md).
 
 ## Contenido
 
@@ -119,6 +120,6 @@ Si usas LazyEdge en una investigación, cita el repositorio. GitHub lee [CITATIO
 
 ## Estado
 
-**Vista previa v0.1.** La interfaz pública puede cambiar. Este repositorio describe la base segura prevista; no afirma que un dominio, servidor, túnel, versión npm o despliegue LocalLLM concreto esté activo hasta verificar ese entorno de manera independiente. No uses LazyEdge como único control para sistemas sensibles o críticos para la seguridad física.
+**Vista previa v0.2.** La interfaz pública puede cambiar. Este repositorio describe la base segura prevista; no afirma que un dominio, servidor, túnel, versión npm o despliegue LocalLLM concreto esté activo hasta verificar ese entorno de manera independiente. No uses LazyEdge como único control para sistemas sensibles o críticos para la seguridad física.
 
 MIT © [Lachlan Chen](https://github.com/lachlanchen)

@@ -33,8 +33,9 @@ flowchart LR
 - **凭据分离：** 客户端、内部中继、上游服务和 SSH 凭据彼此不同，并全部放在清单之外。
 - **可替换传输层：** 首先支持 OpenSSH；应用契约与未来的 WireGuard、rathole 或 frp 传输解耦。
 - **可迁移边缘：** 在第二个云上渲染同一份已审查项目，并行连接并测试，然后再切换 DNS。
+- **可选私有聊天（v0.2 预览）：** 专用 loopback BFF 提供默认明亮/深色的可安装 PWA、增量文本流式输出、可选的记住登录与浏览器密码管理器支持，以及安全 Markdown 和同源离线 KaTeX；API 令牌和原始模型路由始终留在服务器端。
 
-LazyEdge 与 ngrok 式反向隧道解决相似问题，但有意缩小范围：v0.1 只公开经过审查的 HTTP API 路由，不开放任意 TCP 端口，也不生成临时公网 URL。请阅读[大规模系统概念](../docs/concepts-at-scale.md)了解技术全貌。
+LazyEdge 与 ngrok 式反向隧道解决相似问题，但有意缩小范围：v0.2 预览只公开经过审查的 HTTP API 路由，不开放任意 TCP 端口，也不生成临时公网 URL。请阅读[大规模系统概念](../docs/concepts-at-scale.md)了解技术全貌。
 
 ## 快速开始
 
@@ -61,13 +62,13 @@ npx @lazyingart/lazyedge render accounts --config ./lazyedge.yaml \
 npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 ```
 
-上面的 Caddy 命令使用 Automatic HTTPS。只有边缘端已经采用 `/etc/letsencrypt/live/<host>/` 的 Certbot 布局时，才添加 `--manual-certificates`。账户渲染器要求专用 Ed25519 公钥；OpenSSH 路径只引用 worker 上的私有文件，不会复制其内容。systemd 命令输出带标签的审查包，也可用 `--component edge|worker|tunnel|caddy|redirect|certbot` 只渲染一个部分。
+上面的 Caddy 命令使用 Automatic HTTPS。只有边缘端已经采用 `/etc/letsencrypt/live/<host>/` 的 Certbot 布局时，才添加 `--manual-certificates`。账户渲染器要求专用 Ed25519 公钥；OpenSSH 路径只引用 worker 上的私有文件，不会复制其内容。systemd 命令输出带标签的审查包，也可用 `--component edge|worker|tunnel|caddy|redirect|certbot|chat` 只渲染一个部分。
 
 请按信任边界拆分绑定文件：仅在公网网关放置 [edge 示例](../examples/local-llm/bindings.edge.example.yaml)，仅在私有计算机放置 [worker 示例](../examples/local-llm/bindings.worker.example.yaml)。每个运行时只读取本角色所需的凭据，不需要另一角色的凭据存储。
 
 启动后，请在云端运行 `doctor --role edge`，在私有计算机运行 `doctor --role worker`；只有两个角色确实位于同一主机时才使用 `all`。root 专用的 `render redirect-helper` 与 `render nat --direction apply|rollback` 只输出带清单摘要所有权标签的审查产物，绝不会执行防火墙变更。详见[运维](../docs/operations.md)。
 
-`v1alpha1` 接口仍处于预览阶段。0.1 版不提供远程 `apply`、`rollback` 或 `uninstall`；渲染器只输出可审查的产物，由管理员有意识地安装。详见[完整快速上手](../docs/quickstart.md)。
+`v1alpha1` 接口仍处于预览阶段。0.2 版不提供远程 `apply`、`rollback` 或 `uninstall`；渲染器只输出可审查的产物，由管理员有意识地安装。详见[完整快速上手](../docs/quickstart.md)。
 
 ## 当前内容
 
@@ -119,6 +120,6 @@ git diff --check
 
 ## 状态
 
-**v0.1 预览版。** 公共接口可能变化。本仓库描述预期的安全基线；在独立验证具体环境之前，不会宣称任何特定域名、云服务器、隧道、npm 版本或 LocalLLM 部署已经上线。不要把 LazyEdge 作为敏感或安全关键系统的唯一防护。
+**v0.2 预览版。** 公共接口可能变化。本仓库描述预期的安全基线；在独立验证具体环境之前，不会宣称任何特定域名、云服务器、隧道、npm 版本或 LocalLLM 部署已经上线。不要把 LazyEdge 作为敏感或安全关键系统的唯一防护。
 
 MIT © [Lachlan Chen](https://github.com/lachlanchen)

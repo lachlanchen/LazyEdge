@@ -3,12 +3,13 @@ Description=LazyEdge pinned outbound OpenSSH reverse tunnel
 Wants=network-online.target lazyedge-worker.service
 After=network-online.target
 After=lazyedge-worker.service
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
 ExecStart=/usr/bin/ssh -NT -F %h/.config/lazyedge/ssh/config lazyedge-edge
 Restart=always
-RestartSec=5s
+RestartSec=15s
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

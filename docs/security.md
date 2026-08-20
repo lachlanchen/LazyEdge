@@ -20,7 +20,7 @@ This promise covers LazyEdge itself. Your reverse proxy, system journal, upstrea
 
 External, relay, and upstream credentials are separate on purpose. A credential valid at one boundary must not silently become valid at another.
 
-The optional browser chat adds two more deliberately narrow assets: a salted password verifier and a BFF client token scoped to one service, host, `GET`/`POST`, and the two required `/v1` paths. The recoverable browser password remains owner-side; the edge receives only its scrypt verifier. The BFF runs as `lazyedge-chat`, not the edge or tunnel account, and receives its two runtime files through systemd credentials.
+The optional browser chat adds three more deliberately narrow assets: a salted password verifier, a BFF client token scoped to one service, host, `GET`/`POST`, and the two required `/v1` paths, and an independent remembered-session secret. The recoverable browser password remains owner-side; the edge receives only its scrypt verifier. The BFF runs as `lazyedge-chat`, not the edge or tunnel account, and receives its runtime files through systemd credentials.
 
 ## Assumed trust
 
@@ -76,7 +76,7 @@ Keep the [edge bindings](../examples/local-llm/bindings.edge.example.yaml) on th
 
 `references/private/` is ignored and excluded from npm for secret-free machine notes only. It is not a secret vault.
 
-Private chat uses opaque in-memory sessions, strict cookies, exact Origin and Fetch Metadata, session-bound CSRF, single-flight/rate-limited scrypt verification, stable model aliases, and text-only request reserialization. Conversation persistence is browser-local and is therefore governed by the security of that browser profile. See the full [private-chat contract](private-chat.md).
+Private chat uses opaque sessions, strict cookies, exact Origin and Fetch Metadata, session-bound CSRF, single-flight/rate-limited scrypt verification, stable model aliases, and text-only HTTP/SSE request reserialization. A normal session is memory-only; an opt-in remembered session persists only keyed session and CSRF digests plus expiry metadata in a protected, dedicated state file—never a password or raw cookie. Browser password saving is a best-effort browser-password-manager operation only; LazyEdge never writes a password to browser storage, its service worker, server state, or logs. Its service worker caches only the exact public app shell, never `/chat/api/*`, `/v1/*`, credentials, conversations, or model responses. Conversation persistence is browser-local and is therefore governed by the security of that browser profile. See the full [private-chat contract](private-chat.md).
 
 ## Safe review before exposure
 

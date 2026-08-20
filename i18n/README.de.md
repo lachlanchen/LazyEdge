@@ -33,8 +33,9 @@ flowchart LR
 - **Getrennte Zugangsdaten:** Client-, Relay-, Upstream- und SSH-Zugangsdaten sind verschieden und bleiben außerhalb des Manifests.
 - **Austauschbarer Transport:** Zunächst OpenSSH; der Anwendungsvertrag bleibt von künftigem WireGuard-, rathole- oder frp-Transport entkoppelt.
 - **Migrierbarer Edge:** Erzeugen Sie dasselbe geprüfte Projekt in einer zweiten Cloud, verbinden und testen Sie es parallel und verschieben Sie danach DNS.
+- **Optionaler privater Chat (v0.2-Vorschau):** Ein eigener Loopback-BFF liefert eine installierbare, standardmäßig helle/dunkle PWA mit schrittweisem Text-Streaming, optional dauerhaftem Anmelden und Unterstützung des Browser-Passwortmanagers sowie sicherem Markdown und same-origin KaTeX für offline—API-Tokens und rohe Modellrouten bleiben dabei serverseitig.
 
-LazyEdge löst einen ähnlichen Bedarf wie ein ngrok-artiger Reverse-Tunnel, ist aber absichtlich enger gefasst: v0.1 veröffentlicht geprüfte HTTP-API-Routen, keine beliebigen TCP-Ports oder spontanen öffentlichen URLs. Die technische Einordnung finden Sie unter [Konzepte im großen Maßstab](../docs/concepts-at-scale.md).
+LazyEdge löst einen ähnlichen Bedarf wie ein ngrok-artiger Reverse-Tunnel, ist aber absichtlich enger gefasst: Die v0.2-Vorschau veröffentlicht geprüfte HTTP-API-Routen, keine beliebigen TCP-Ports oder spontanen öffentlichen URLs. Die technische Einordnung finden Sie unter [Konzepte im großen Maßstab](../docs/concepts-at-scale.md).
 
 ## Schnellstart
 
@@ -61,13 +62,13 @@ npx @lazyingart/lazyedge render accounts --config ./lazyedge.yaml \
 npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 ```
 
-Der obige Caddy-Befehl verwendet Automatic HTTPS. Ergänzen Sie `--manual-certificates` nur für eine vorhandene Certbot-Struktur unter `/etc/letsencrypt/live/<host>/`. Der Account-Renderer benötigt einen eigenen öffentlichen Ed25519-Schlüssel; die OpenSSH-Pfade verweisen auf private Worker-Dateien, ohne deren Inhalt zu kopieren. Der systemd-Befehl erzeugt ein beschriftetes Prüfbündel oder mit `--component edge|worker|tunnel|caddy|redirect|certbot` einen einzelnen Abschnitt.
+Der obige Caddy-Befehl verwendet Automatic HTTPS. Ergänzen Sie `--manual-certificates` nur für eine vorhandene Certbot-Struktur unter `/etc/letsencrypt/live/<host>/`. Der Account-Renderer benötigt einen eigenen öffentlichen Ed25519-Schlüssel; die OpenSSH-Pfade verweisen auf private Worker-Dateien, ohne deren Inhalt zu kopieren. Der systemd-Befehl erzeugt ein beschriftetes Prüfbündel oder mit `--component edge|worker|tunnel|caddy|redirect|certbot|chat` einen einzelnen Abschnitt.
 
 Trennen Sie Bindings nach Vertrauensgrenze: Legen Sie das [Edge-Beispiel](../examples/local-llm/bindings.edge.example.yaml) nur auf dem öffentlichen Gateway und das [Worker-Beispiel](../examples/local-llm/bindings.worker.example.yaml) nur auf dem privaten Rechner ab. Jeder Prozess liest ausschließlich die Anmeldedaten seiner Rolle; keine Rolle benötigt den Credential-Store der anderen.
 
 Führen Sie nach dem Start `doctor --role edge` in der Cloud und `doctor --role worker` auf dem privaten Rechner aus; verwenden Sie `all` nur bei tatsächlich gemeinsamem Host. Die root-spezifischen Befehle `render redirect-helper` und `render nat --direction apply|rollback` geben lediglich Prüfarbeitsstände mit einer aus dem Manifest-Digest abgeleiteten Eigentumsmarke aus und ändern nie die Firewall. Siehe [Betrieb](../docs/operations.md).
 
-Die Schnittstelle `v1alpha1` ist eine Vorschau. Version 0.1 liefert kein entferntes `apply`, `rollback` oder `uninstall`: Renderer schreiben prüfbare Artefakte, die ein Administrator bewusst installiert. Siehe den [vollständigen Schnellstart](../docs/quickstart.md).
+Die Schnittstelle `v1alpha1` ist eine Vorschau. Version 0.2 liefert kein entferntes `apply`, `rollback` oder `uninstall`: Renderer schreiben prüfbare Artefakte, die ein Administrator bewusst installiert. Siehe den [vollständigen Schnellstart](../docs/quickstart.md).
 
 ## Inhalt
 
@@ -119,6 +120,6 @@ Wenn Sie LazyEdge in der Forschung verwenden, zitieren Sie das Repository. GitHu
 
 ## Status
 
-**v0.1-Vorschau.** Die öffentliche Schnittstelle kann sich ändern. Dieses Repository beschreibt die beabsichtigte sichere Grundlage; es behauptet nicht, dass eine bestimmte Domain, ein Cloud-Server, Tunnel, npm-Paket oder eine LocalLLM-Bereitstellung aktiv ist, bevor diese Umgebung unabhängig geprüft wurde. Verwenden Sie LazyEdge nicht als alleinige Schutzmaßnahme für sensible oder sicherheitskritische Systeme.
+**v0.2-Vorschau.** Die öffentliche Schnittstelle kann sich ändern. Dieses Repository beschreibt die beabsichtigte sichere Grundlage; es behauptet nicht, dass eine bestimmte Domain, ein Cloud-Server, Tunnel, npm-Paket oder eine LocalLLM-Bereitstellung aktiv ist, bevor diese Umgebung unabhängig geprüft wurde. Verwenden Sie LazyEdge nicht als alleinige Schutzmaßnahme für sensible oder sicherheitskritische Systeme.
 
 MIT © [Lachlan Chen](https://github.com/lachlanchen)

@@ -4,11 +4,26 @@ import {
 } from "node:crypto";
 import { lstat, readFile } from "node:fs/promises";
 import http from "node:http";
+import { createRequire } from "node:module";
 import { isIP } from "node:net";
 import { StringDecoder } from "node:string_decoder";
 import { promisify } from "node:util";
 
-import { CHAT_CSS, CHAT_HTML, CHAT_JS } from "./chat-assets.js";
+import {
+  CHAT_CSS,
+  CHAT_HTML,
+  CHAT_ICON_192,
+  CHAT_ICON_512,
+  CHAT_JS,
+  CHAT_MANIFEST,
+  CHAT_MARKDOWN_JS,
+  CHAT_SERVICE_WORKER,
+} from "./chat-assets.js";
+import {
+  ChatSessionStore,
+  REMEMBER_SESSION_ABSOLUTE_MS,
+  REMEMBER_SESSION_IDLE_MS,
+} from "./chat-session-store.js";
 import { normalizeManifest } from "./config.js";
 import {
   assertSecretToken,
@@ -48,6 +63,20 @@ const MAX_COMPLETION_RESPONSE_BYTES = 8 * 1024 * 1024;
 const MAX_COMPLETION_EVENT_BYTES = 256 * 1024;
 const MAX_COMPLETION_TEXT_CHARACTERS = 32_000;
 const MAX_COMPLETION_WALL_MS = 15 * 60 * 1000;
+const MAX_SESSION_CLOCK_SKEW_MS = 5 * 60 * 1000;
+const require = createRequire(import.meta.url);
+const KATEX_MODULE = await readFile(require.resolve("katex/dist/katex.mjs"));
+const STATIC_ASSETS = new Map([
+  ["/", [CHAT_HTML, "text/html; charset=utf-8"]],
+  ["/manifest.webmanifest", [CHAT_MANIFEST, "application/manifest+json; charset=utf-8"]],
+  ["/sw.js", [CHAT_SERVICE_WORKER, "text/javascript; charset=utf-8"]],
+  ["/assets/app.css", [CHAT_CSS, "text/css; charset=utf-8"]],
+  ["/assets/app.js", [CHAT_JS, "text/javascript; charset=utf-8"]],
+  ["/assets/markdown.js", [CHAT_MARKDOWN_JS, "text/javascript; charset=utf-8"]],
+  ["/assets/katex.mjs", [KATEX_MODULE, "text/javascript; charset=utf-8"]],
+  ["/assets/icon-192.png", [CHAT_ICON_192, "image/png"]],
+  ["/assets/icon-512.png", [CHAT_ICON_512, "image/png"]],
+]);
 
 function assertPassword(value) {
   if (
@@ -183,10 +212,11 @@ function parseCookies(request) {
   return result;
 }
 
-function setSessionCookies(response, sessionToken, csrfToken) {
+function setSessionCookies(response, sessionToken, csrfToken, { remembered = false } = {}) {
+  const maximumAge = remembered ? REMEMBER_SESSION_ABSOLUTE_MS : SESSION_ABSOLUTE_MS;
   response.setHeader("set-cookie", [
-    `${SESSION_COOKIE}=${sessionToken}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${SESSION_ABSOLUTE_MS / 1000}; Priority=High`,
-    `${CSRF_COOKIE}=${csrfToken}; Path=/; Secure; SameSite=Strict; Max-Age=${SESSION_ABSOLUTE_MS / 1000}; Priority=High`,
+    `${SESSION_COOKIE}=${sessionToken}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${maximumAge / 1000}; Priority=High`,
+    `${CSRF_COOKIE}=${csrfToken}; Path=/; Secure; SameSite=Strict; Max-Age=${maximumAge / 1000}; Priority=High`,
   ]);
 }
 
@@ -544,10 +574,7 @@ async function streamCompletion(
 }
 
 function asset(path) {
-  if (path === "/") return [CHAT_HTML, "text/html; charset=utf-8"];
-  if (path === "/assets/app.css") return [CHAT_CSS, "text/css; charset=utf-8"];
-  if (path === "/assets/app.js") return [CHAT_JS, "text/javascript; charset=utf-8"];
-  return null;
+  return STATIC_ASSETS.get(path) ?? null;
 }
 
 function sessionHandle(server, listener, serviceId, beforeClose = () => {}) {
@@ -575,6 +602,8 @@ export async function startChatServer({
   passwordHash,
   clientToken,
   listen: listenOverride,
+  rememberSessionStorePath,
+  rememberSessionSecret,
   clock = () => Date.now(),
   signal,
 } = {}) {
@@ -586,6 +615,29 @@ export async function startChatServer({
   }
   if (!PASSWORD_RECORD_PATTERN.test(passwordHash)) throw new Error("Chat password record is invalid");
   const token = assertSecretToken(clientToken, "chat client token");
+  if ((rememberSessionStorePath === undefined) !== (rememberSessionSecret === undefined)) {
+    throw new TypeError(
+      "Remembered chat sessions require both rememberSessionStorePath and rememberSessionSecret",
+    );
+  }
+  const rememberStoreConfigured = rememberSessionStorePath !== undefined;
+  let rememberStore = null;
+  if (rememberStoreConfigured) {
+    try {
+      rememberStore = await ChatSessionStore.open({
+        filePath: rememberSessionStorePath,
+        secret: rememberSessionSecret,
+        passwordHash,
+        clock,
+        maxSessions: MAX_SESSIONS,
+      });
+    } catch {
+      // A corrupt, symlinked, or insecure durable store must not authenticate
+      // any remembered cookie. Keep ordinary in-memory login available so the
+      // owner is not locked out while repairing the optional persistence file.
+      rememberStore = null;
+    }
+  }
   const allowedHosts = new Set(service.domains);
   const completionUploadLimit = Math.min(
     MAX_COMPLETION_UPLOADS_TOTAL,
@@ -598,7 +650,7 @@ export async function startChatServer({
   let totalCompletionUploads = 0;
   let passwordVerificationActive = false;
 
-  const deleteSession = (digest) => {
+  const endSessionRuntime = (digest) => {
     const session = sessions.get(digest);
     if (!session) return;
     sessions.delete(digest);
@@ -608,6 +660,56 @@ export async function startChatServer({
     session.activeStreams.clear();
     for (const pending of session.pendingBodies) {
       pending.destroy(new Error("chat session ended"));
+    }
+  };
+
+  const deleteSession = async (digest, { durable = true } = {}) => {
+    const session = sessions.get(digest);
+    if (!session) return false;
+    if (durable && session.remembered) {
+      if (rememberStore === null) return false;
+      await rememberStore.revokeDigest(digest);
+    }
+    endSessionRuntime(digest);
+    return true;
+  };
+
+  const enforceCombinedSessionLimit = async (protectedDigest) => {
+    let remembered = [];
+    if (rememberStore !== null) {
+      try {
+        remembered = await rememberStore.listActive();
+      } catch (error) {
+        if (sessions.get(protectedDigest)?.remembered) throw error;
+      }
+    }
+    const combined = [
+      ...remembered.map((record) => ({
+        digest: record.digest,
+        createdAt: record.createdAt,
+        remembered: true,
+      })),
+      ...[...sessions.entries()]
+        .filter(([, session]) => !session.remembered)
+        .map(([digest, session]) => ({
+          digest,
+          createdAt: session.createdAt,
+          remembered: false,
+        })),
+    ].sort((left, right) => (
+      left.createdAt - right.createdAt || left.digest.localeCompare(right.digest)
+    ));
+    while (combined.length > MAX_SESSIONS) {
+      const victimIndex = combined.findIndex((entry) => entry.digest !== protectedDigest);
+      if (victimIndex === -1) throw new Error("chat_session_limit_unavailable");
+      const [victim] = combined.splice(victimIndex, 1);
+      if (victim.remembered) {
+        if (rememberStore === null) throw new Error("remembered_sessions_unavailable");
+        await rememberStore.revokeDigest(victim.digest);
+        endSessionRuntime(victim.digest);
+      } else {
+        endSessionRuntime(victim.digest);
+      }
     }
   };
 
@@ -668,39 +770,109 @@ export async function startChatServer({
     return failedLogins.get(client) ?? [];
   };
 
-  const pruneSessions = () => {
+  const sessionExpired = (session, now) => {
+    const idleMs = session.remembered ? REMEMBER_SESSION_IDLE_MS : SESSION_IDLE_MS;
+    const absoluteMs = session.remembered ? REMEMBER_SESSION_ABSOLUTE_MS : SESSION_ABSOLUTE_MS;
+    if (
+      session.createdAt > now + MAX_SESSION_CLOCK_SKEW_MS
+      || session.lastSeen > now + MAX_SESSION_CLOCK_SKEW_MS
+    ) return true;
+    const effectiveNow = Math.max(now, session.lastSeen);
+    return effectiveNow - session.lastSeen > idleMs
+      || effectiveNow - session.createdAt > absoluteMs;
+  };
+  const pruneSessions = async () => {
     const now = clock();
     for (const [digest, session] of sessions) {
-      if (now - session.lastSeen > SESSION_IDLE_MS || now - session.createdAt > SESSION_ABSOLUTE_MS) {
-        deleteSession(digest);
+      if (!sessionExpired(session, now)) continue;
+      try {
+        await deleteSession(digest);
+      } catch {
+        // Removing the local runtime state fails closed. The authenticated
+        // store path will report a bounded service error until persistence is
+        // healthy again, rather than reviving this cached session.
+        endSessionRuntime(digest);
       }
     }
   };
-  const authenticate = (request) => {
-    pruneSessions();
+  const authenticate = async (request) => {
+    await pruneSessions();
     const cookies = parseCookies(request);
     const raw = cookies?.get(SESSION_COOKIE);
     if (typeof raw !== "string" || !/^[A-Za-z0-9_-]{43}$/u.test(raw)) return null;
-    const digest = sha256(raw);
-    const session = sessions.get(digest);
-    if (!session) return null;
-    session.lastSeen = clock();
-    return { cookies, digest, session };
+    const shortDigest = sha256(raw);
+    const shortSession = sessions.get(shortDigest);
+    if (shortSession && !shortSession.remembered) {
+      shortSession.lastSeen = Math.max(shortSession.lastSeen, clock());
+      return { cookies, digest: shortDigest, raw, session: shortSession };
+    }
+    if (rememberStore === null) {
+      if (rememberStoreConfigured) throw new Error("session_store_unavailable");
+      return null;
+    }
+    const record = await rememberStore.verify(raw);
+    if (record === null) return null;
+    let session = sessions.get(record.digest);
+    if (session === undefined) {
+      session = {
+        remembered: true,
+        createdAt: record.createdAt,
+        lastSeen: record.lastSeen,
+        csrfDigest: record.csrfDigest,
+        activeStreams: new Set(),
+        pendingBodies: new Set(),
+      };
+      sessions.set(record.digest, session);
+      try {
+        await enforceCombinedSessionLimit(record.digest);
+      } catch (error) {
+        endSessionRuntime(record.digest);
+        throw error;
+      }
+    } else {
+      session.createdAt = record.createdAt;
+      session.lastSeen = record.lastSeen;
+      session.csrfDigest = record.csrfDigest;
+    }
+    return { cookies, digest: record.digest, raw, session };
   };
-  const createSession = (response) => {
-    pruneSessions();
-    while (sessions.size >= MAX_SESSIONS) deleteSession(sessions.keys().next().value);
+  const createSession = async (response, remembered) => {
+    await pruneSessions();
     const raw = randomBytes(SESSION_TOKEN_BYTES).toString("base64url");
     const csrf = randomBytes(CSRF_TOKEN_BYTES).toString("base64url");
     const now = clock();
-    sessions.set(sha256(raw), {
-      createdAt: now,
-      lastSeen: now,
+    let sessionRaw = raw;
+    let digest = sha256(raw);
+    let createdAt = now;
+    let lastSeen = now;
+    if (remembered) {
+      if (rememberStore === null) throw new Error("remembered_sessions_unavailable");
+      const stored = await rememberStore.create(sha256(csrf));
+      sessionRaw = stored.raw;
+      digest = stored.record.digest;
+      createdAt = stored.record.createdAt;
+      lastSeen = stored.record.lastSeen;
+      for (const evicted of stored.evicted) endSessionRuntime(evicted);
+    }
+    sessions.set(digest, {
+      remembered,
+      createdAt,
+      lastSeen,
       csrfDigest: sha256(csrf),
       activeStreams: new Set(),
       pendingBodies: new Set(),
     });
-    setSessionCookies(response, raw, csrf);
+    try {
+      await enforceCombinedSessionLimit(digest);
+    } catch (error) {
+      try {
+        await deleteSession(digest);
+      } catch {
+        endSessionRuntime(digest);
+      }
+      throw error;
+    }
+    setSessionCookies(response, sessionRaw, csrf, { remembered });
     return csrf;
   };
 
@@ -804,7 +976,16 @@ export async function startChatServer({
       }
       passwordVerificationActive = true;
       try {
-        const shape = exactObject(body, new Set(["username", "password"]));
+        const loginKeys = body !== null && typeof body === "object" && !Array.isArray(body)
+          ? Object.keys(body)
+          : [];
+        const shape = exactObject(body, new Set(["username", "password", "remember"]))
+          && Object.hasOwn(body, "username")
+          && Object.hasOwn(body, "password")
+          && (loginKeys.length === 2 || loginKeys.length === 3)
+          && (loginKeys.length === 2
+            ? !Object.hasOwn(body, "remember")
+            : typeof body.remember === "boolean");
         const usernameMatches = shape
           && typeof body.username === "string"
           && constantTimeEqual(body.username, service.chat.username);
@@ -820,15 +1001,31 @@ export async function startChatServer({
           return;
         }
         failedLogins.delete(loginClient);
-        const csrfToken = createSession(response);
-        sendJson(response, 200, { username: service.chat.username, csrfToken });
+        const remembered = body.remember === true;
+        try {
+          const csrfToken = await createSession(response, remembered);
+          sendJson(response, 200, {
+            username: service.chat.username,
+            csrfToken,
+            remembered,
+          });
+        } catch {
+          sendError(response, 503, "session_store_unavailable");
+        }
       } finally {
         passwordVerificationActive = false;
       }
       return;
     }
 
-    const authenticated = authenticate(request);
+    let authenticated;
+    try {
+      authenticated = await authenticate(request);
+    } catch {
+      sendError(response, 503, "session_store_unavailable");
+      request.resume();
+      return;
+    }
     if (request.method === "GET" && target.path === "/chat/api/session") {
       if (!authenticated) {
         sendError(response, 401, "unauthorized");
@@ -847,6 +1044,7 @@ export async function startChatServer({
         authenticated: true,
         username: service.chat.username,
         csrfToken,
+        remembered: authenticated.session.remembered,
       });
       return;
     }
@@ -873,7 +1071,13 @@ export async function startChatServer({
         request.resume();
         return;
       }
-      deleteSession(authenticated.digest);
+      try {
+        await deleteSession(authenticated.digest);
+      } catch {
+        sendError(response, 503, "session_store_unavailable");
+        request.resume();
+        return;
+      }
       clearSessionCookies(response);
       sendJson(response, 200, { signedOut: true });
       request.resume();
@@ -903,9 +1107,12 @@ export async function startChatServer({
         const payload = normalizeCompletion(input, service.chat);
         // Body reads yield to the event loop. Logout or expiry may revoke this
         // session while a slow authenticated upload is still incomplete.
-        pruneSessions();
+        await pruneSessions();
+        const rememberedIsCurrent = !authenticated.session.remembered
+          || (rememberStore !== null && await rememberStore.hasDigest(authenticated.digest));
         if (
           sessions.get(authenticated.digest) !== authenticated.session
+          || !rememberedIsCurrent
           || !csrfMatches(request, authenticated)
         ) {
           sendError(response, 401, "unauthorized");
@@ -942,7 +1149,7 @@ export async function startChatServer({
   const listener = runtimeListen(listenOverride ?? service.chat.listen);
   await listen(server, listener);
   const closeSessions = () => {
-    for (const digest of [...sessions.keys()]) deleteSession(digest);
+    for (const digest of [...sessions.keys()]) endSessionRuntime(digest);
   };
   if (signal) {
     if (signal.aborted) {

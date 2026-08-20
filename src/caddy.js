@@ -173,7 +173,7 @@ function renderChatRoutes(listener, indent = "    ") {
   return [
     `${indent}@lazyedge_chat_document {`,
     `${indent}    method GET HEAD`,
-    `${indent}    path / /assets/app.css /assets/app.js`,
+    `${indent}    path / /manifest.webmanifest /sw.js /assets/app.css /assets/app.js /assets/markdown.js /assets/katex.mjs /assets/icon-192.png /assets/icon-512.png`,
     `${indent}}`,
     `${indent}handle @lazyedge_chat_document {`,
     renderReverseProxy(
