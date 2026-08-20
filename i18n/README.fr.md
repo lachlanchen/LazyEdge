@@ -33,7 +33,6 @@ flowchart LR
 - **Séparation des identifiants :** les identifiants client, relais, amont et SSH sont différents et restent hors du manifeste.
 - **Transport remplaçable :** OpenSSH en premier ; le contrat applicatif reste découplé d'un futur transport WireGuard, rathole ou frp.
 - **Passerelle migrable :** générez le même projet relu sur un second cloud, connectez-le en parallèle, testez, puis déplacez le DNS.
-- **Chat privé facultatif (aperçu v0.2) :** un BFF dédié sur loopback fournit une PWA installable claire par défaut/sombre, un flux de texte incrémental, une connexion mémorisée facultative et la prise en charge du gestionnaire de mots de passe du navigateur, ainsi que Markdown sûr et KaTeX hors ligne du même origin ; les jetons d’API et routes brutes de modèle restent côté serveur.
 
 LazyEdge répond au même type de besoin qu'un tunnel inverse façon ngrok, mais reste volontairement plus étroit : l’aperçu v0.2 publie des routes d'API HTTP relues, pas des ports TCP arbitraires ni des URL publiques improvisées. Consultez les [concepts à grande échelle](../docs/concepts-at-scale.md) pour situer les technologies.
 
@@ -62,7 +61,7 @@ npx @lazyingart/lazyedge render accounts --config ./lazyedge.yaml \
 npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 ```
 
-La commande Caddy ci-dessus utilise HTTPS automatique. Ajoutez `--manual-certificates` uniquement pour une arborescence Certbot existante sous `/etc/letsencrypt/live/<host>/`. Le générateur de comptes exige une clé publique Ed25519 dédiée ; les chemins OpenSSH désignent les fichiers privés du worker sans en copier le contenu. La commande systemd produit un lot de vérification étiqueté ou accepte `--component edge|worker|tunnel|caddy|redirect|certbot|chat` pour une seule section.
+La commande Caddy ci-dessus utilise HTTPS automatique. Ajoutez `--manual-certificates` uniquement pour une arborescence Certbot existante sous `/etc/letsencrypt/live/<host>/`. Le générateur de comptes exige une clé publique Ed25519 dédiée ; les chemins OpenSSH désignent les fichiers privés du worker sans en copier le contenu. La commande systemd produit un lot de vérification étiqueté ou accepte `--component edge|worker|tunnel|caddy|redirect|certbot` pour une seule section.
 
 Séparez les liaisons par frontière de confiance : placez l'[exemple edge](../examples/local-llm/bindings.edge.example.yaml) uniquement sur la passerelle publique et l'[exemple worker](../examples/local-llm/bindings.worker.example.yaml) uniquement sur le calcul privé. Chaque processus ne lit que les identifiants de son rôle ; aucun n'a besoin du magasin d'identifiants de l'autre.
 
@@ -89,7 +88,7 @@ L'interface `v1alpha1` est expérimentale. La version 0.2 ne fournit pas de `app
 - [Sécurité et modèle de menace](../docs/security.md)
 - [Exploitation et retour arrière](../docs/operations.md)
 - [Migration Alibaba → Huawei ou double passerelle](../docs/migration.md)
-- [Intégration LocalLLM + AgInTi](../docs/integrations/local-llm-aginti.md)
+- [Clients compatibles avec OpenAI](../docs/integrations/openai-compatible-clients.md)
 - [Dépannage](../docs/troubleshooting.md)
 - [Lien avec les grands systèmes multiserveurs](../docs/concepts-at-scale.md)
 

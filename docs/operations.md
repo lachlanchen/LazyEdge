@@ -152,16 +152,6 @@ Health checks should be cheap and disclose no model list, filesystem path, build
 
 ## Updating
 
-### Optional chat overlay on an existing edge
-
-Adding a `chat` block changes the manifest digest. If live edge/redirect/nft
-ownership was created from the primary manifest, leave that manifest and those
-units untouched. Copy it to `/etc/lazyedge-chat/lazyedge.yaml`, add only chat,
-record both digests, and use the overlay only to render Caddy and
-`lazyedge-chat.service`. Do not render or apply NAT, the redirect helper, or the
-edge/worker/tunnel units from the overlay without a separate reviewed ownership
-migration. Follow the complete [private-chat overlay procedure](private-chat.md#existing-deployment-immutable-overlay-rule).
-
 1. Read release notes and diff the manifest/schema changes.
 2. Back up only the current config, generated units, token metadata, and last-known-good digest—not live tokens in a shared archive.
 3. Validate and render with the new version without applying.

@@ -33,7 +33,6 @@ flowchart LR
 - **憑證分隔：** 用戶端、中繼、上游與 SSH 憑證彼此不同，且都放在清單之外。
 - **可替換傳輸層：** 先採用 OpenSSH；應用程式契約與未來的 WireGuard、rathole 或 frp 傳輸解耦。
 - **可遷移邊緣：** 在第二個雲端產生同一份已審查專案，平行連線並測試後再切換 DNS。
-- **可選私有聊天（v0.2 預覽）：** 專用 loopback BFF 提供預設明亮/深色的可安裝 PWA、逐步文字串流、可選擇的記住登入和瀏覽器密碼管理員支援，以及安全 Markdown 與同源離線 KaTeX；API token 與原始模型路由始終留在伺服器端。
 
 LazyEdge 與 ngrok 式反向通道處理相似問題，但刻意縮小範圍：v0.2 預覽只公開經過審查的 HTTP API 路由，不開放任意 TCP 連接埠，也不產生臨時公開 URL。請閱讀[大規模系統概念](../docs/concepts-at-scale.md)了解技術全貌。
 
@@ -62,7 +61,7 @@ npx @lazyingart/lazyedge render accounts --config ./lazyedge.yaml \
 npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 ```
 
-上面的 Caddy 指令使用 Automatic HTTPS。只有邊緣端已採用 `/etc/letsencrypt/live/<host>/` 的 Certbot 配置時，才加入 `--manual-certificates`。帳號轉譯器要求專用 Ed25519 公開金鑰；OpenSSH 路徑只引用 worker 上的私有檔案，不會複製內容。systemd 指令輸出帶標籤的審查包，也可用 `--component edge|worker|tunnel|caddy|redirect|certbot|chat` 只產生一個部分。
+上面的 Caddy 指令使用 Automatic HTTPS。只有邊緣端已採用 `/etc/letsencrypt/live/<host>/` 的 Certbot 配置時，才加入 `--manual-certificates`。帳號轉譯器要求專用 Ed25519 公開金鑰；OpenSSH 路徑只引用 worker 上的私有檔案，不會複製內容。systemd 指令輸出帶標籤的審查包，也可用 `--component edge|worker|tunnel|caddy|redirect|certbot` 只產生一個部分。
 
 請依信任邊界拆分綁定檔案：只在公網閘道放置 [edge 範例](../examples/local-llm/bindings.edge.example.yaml)，只在私有運算主機放置 [worker 範例](../examples/local-llm/bindings.worker.example.yaml)。每個執行程序只讀取本身角色所需的憑證，不需要另一角色的憑證儲存區。
 
@@ -89,7 +88,7 @@ npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 - [安全與威脅模型](../docs/security.md)
 - [維運與回復](../docs/operations.md)
 - [Alibaba → Huawei 或雙邊緣遷移](../docs/migration.md)
-- [LocalLLM + AgInTi 整合](../docs/integrations/local-llm-aginti.md)
+- [OpenAI 相容用戶端](../docs/integrations/openai-compatible-clients.md)
 - [疑難排解](../docs/troubleshooting.md)
 - [與大型多伺服器系統的關係](../docs/concepts-at-scale.md)
 

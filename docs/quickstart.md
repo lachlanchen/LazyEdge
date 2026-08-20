@@ -11,7 +11,7 @@ This walkthrough creates and reviews a project. It does not assume that a produc
 - a dedicated unprivileged SSH forwarding account and key;
 - one approved hostname whose DNS you control.
 
-Do not paste a password or token into a command, manifest, support chat, or repository.
+Do not paste a password or token into a command, manifest, support channel, or repository.
 
 ## 1. Inspect and initialize
 
@@ -33,7 +33,7 @@ For a LocalLLM/OpenAI-compatible service, use `profile: localllm-openai`. That p
 
 Its health path is private and must not overlap `/v1/`. Use `generic-http` for another HTTP API and enumerate every allowed path and method exactly; wildcards remain forbidden.
 
-On a managed `localllm-openai` hostname, Caddy normally serves a small static information page for exact `GET /` and `HEAD /` requests. If the optional [private chat](private-chat.md) is configured, the reviewed document, app-shell asset, authentication, model, and HTTP/SSE completion routes instead reach a dedicated loopback chat BFF. Its installable PWA caches only its reviewed public app shell; it never caches chat requests, credentials, conversations, or model responses. In both cases, `/v1` remains the authenticated default-deny API path; LocalLLM Studio, `/api`, Ollama, and other management routes are not published.
+On a managed `localllm-openai` hostname, Caddy serves a small static information page for exact `GET /` and `HEAD /` requests. The `/v1` prefix remains the authenticated default-deny API path; LocalLLM Studio, `/api`, Ollama, and other management routes are not published.
 
 ## 2. Create role-specific secret stores outside the project
 
@@ -136,7 +136,7 @@ npx @lazyingart/lazyedge render caddy \
 
 The public-key file must contain the dedicated worker tunnel's Ed25519 public key and must not be group/world writable. The identity path is the matching private key on the worker; only the path enters rendered SSH configuration, never the key contents. Build `known_hosts` after verifying the edge host key through an independent channel.
 
-Without `--component`, `render systemd` emits a labeled multi-section review bundle. Use `--component edge`, `worker`, `tunnel`, `caddy`, `redirect`, `certbot`, or optional `chat` to render one section at a time after the complete bundle has been reviewed. The root-only `redirect` component is a manual persistence artifact for an already reviewed port cutover; rendering it neither changes nor authorizes firewall state.
+Without `--component`, `render systemd` emits a labeled multi-section review bundle. Use `--component edge`, `worker`, `tunnel`, `caddy`, `redirect`, or `certbot` to render one section at a time after the complete bundle has been reviewed. The root-only `redirect` component is a manual persistence artifact for an already reviewed port cutover; rendering it neither changes nor authorizes firewall state.
 
 Generated units do not install the CLI. Install the reviewed package first and render each unit with the executable, manifest, bindings, and Node.js paths that will actually exist on that host. A user-prefix/NVM worker can use this pattern:
 
@@ -250,5 +250,5 @@ Test through a temporary hostname or explicit resolver override before changing 
 
 - Understand every field in [configuration](configuration.md).
 - Review the [threat model](security.md).
-- Connect [LocalLLM and AgInTi](integrations/local-llm-aginti.md).
+- Connect [OpenAI-compatible clients](integrations/openai-compatible-clients.md).
 - Learn the boundaries in [architecture](architecture.md).

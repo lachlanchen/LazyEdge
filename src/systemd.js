@@ -68,6 +68,14 @@ function assertDescription(value) {
   return value;
 }
 
+function assertPublicIngress(manifest, label) {
+  const hasPublicIngress = (manifest.spec.edge.existingSites?.length ?? 0) > 0
+    || manifest.spec.services.some((service) => (service.exposure ?? "public") === "public");
+  if (!hasPublicIngress) {
+    throw new SecurityError(`${label} requires at least one configured public site`);
+  }
+}
+
 function commonHardening({ protectHome, systemManager = true }) {
   return [
     "NoNewPrivileges=true",
@@ -198,92 +206,6 @@ export function renderWorkerSystemd(input, {
   ].join("\n");
 }
 
-export function renderChatSystemd(input, {
-  serviceUser = "lazyedge-chat",
-  executable = "/usr/local/bin/lazyedge",
-  manifestPath = "/etc/lazyedge-chat/lazyedge.yaml",
-  passwordHashPath,
-  clientTokenPath,
-  rememberSessionStorePath = "/var/lib/lazyedge-chat/sessions.json",
-  rememberSessionSecretPath,
-  pathEnvironment,
-  description = "LazyEdge private LocalLLM chat",
-} = {}) {
-  const manifest = normalizeManifest(input);
-  const chatServices = manifest.spec.services.filter((service) => service.chat !== undefined);
-  if (chatServices.length !== 1) {
-    throw new SecurityError("Chat systemd unit requires exactly one configured chat service");
-  }
-  const service = chatServices[0];
-  const user = account(serviceUser, "serviceUser");
-  const binary = absolutePath(executable, "executable");
-  const manifestFile = absolutePath(manifestPath, "manifestPath");
-  const passwordFile = absolutePath(
-    passwordHashPath ?? `/etc/lazyedge-chat/secrets/${service.id}-chat-password-hash`,
-    "passwordHashPath",
-  );
-  const tokenFile = absolutePath(
-    clientTokenPath ?? `/etc/lazyedge-chat/secrets/${service.id}-chat-client-token`,
-    "clientTokenPath",
-  );
-  const sessionStoreFile = absolutePath(
-    rememberSessionStorePath,
-    "rememberSessionStorePath",
-  );
-  if (!sessionStoreFile.startsWith("/var/lib/lazyedge-chat/")) {
-    throw new SecurityError(
-      "rememberSessionStorePath must be below /var/lib/lazyedge-chat",
-    );
-  }
-  const sessionSecretFile = absolutePath(
-    rememberSessionSecretPath
-      ?? `/etc/lazyedge-chat/secrets/${service.id}-chat-session-secret`,
-    "rememberSessionSecretPath",
-  );
-  const executablePath = runtimePath(pathEnvironment);
-  return [
-    "[Unit]",
-    `Description=${assertDescription(description)}`,
-    "Wants=network-online.target lazyedge-edge.service",
-    "After=network-online.target lazyedge-edge.service",
-    "StartLimitIntervalSec=300",
-    "StartLimitBurst=5",
-    "",
-    "[Service]",
-    "Type=simple",
-    `User=${user}`,
-    `Group=${user}`,
-    ...(executablePath === undefined ? [] : [`Environment=PATH=${executablePath}`]),
-    `LoadCredential=chat-password-hash:${passwordFile}`,
-    `LoadCredential=chat-client-token:${tokenFile}`,
-    `LoadCredential=chat-session-secret:${sessionSecretFile}`,
-    `ExecStart=${binary} serve chat --config ${manifestFile} --service ${service.id} --password-hash-file %d/chat-password-hash --client-token-file %d/chat-client-token --remember-session-store ${sessionStoreFile} --remember-session-secret-file %d/chat-session-secret`,
-    "Restart=on-failure",
-    "RestartSec=5s",
-    "TimeoutStartSec=30s",
-    "TimeoutStopSec=30s",
-    "RuntimeDirectory=lazyedge-chat",
-    "RuntimeDirectoryMode=0700",
-    "StateDirectory=lazyedge-chat",
-    "StateDirectoryMode=0700",
-    "ReadOnlyPaths=/etc/lazyedge-chat",
-    "ReadWritePaths=/var/lib/lazyedge-chat /run/lazyedge-chat",
-    "InaccessiblePaths=-/etc/lazyedge -/var/lib/lazyedge -/var/log/lazyedge",
-    "IPAddressDeny=any",
-    "IPAddressAllow=localhost",
-    "MemoryMax=512M",
-    "TasksMax=64",
-    "LimitNOFILE=1024",
-    "ProtectProc=invisible",
-    "ProcSubset=pid",
-    ...commonHardening({ protectHome: "true" }),
-    "",
-    "[Install]",
-    "WantedBy=multi-user.target",
-    "",
-  ].join("\n");
-}
-
 export function renderTunnelSystemd(input, {
   sshConfigPath = "%h/.config/lazyedge/ssh/config",
   sshAlias = "lazyedge-edge",
@@ -331,18 +253,16 @@ export function renderCaddySystemd(input, {
   description = "LazyEdge shared-SNI Caddy gateway",
 } = {}) {
   const manifest = normalizeManifest(input);
+  assertPublicIngress(manifest, "Caddy systemd rendering");
   const user = account(caddyUser, "caddyUser");
   const certGroup = account(certificateGroup, "certificateGroup");
   const binary = absolutePath(executable, "executable");
   const config = absolutePath(configPath, "configPath");
-  const chatDependency = manifest.spec.services.some((service) => service.chat !== undefined)
-    ? " lazyedge-chat.service"
-    : "";
   return [
     "[Unit]",
     `Description=${assertDescription(description)}`,
-    `Wants=network-online.target lazyedge-edge.service${chatDependency}`,
-    `After=network-online.target lazyedge-edge.service${chatDependency}`,
+    "Wants=network-online.target lazyedge-edge.service",
+    "After=network-online.target lazyedge-edge.service",
     "StartLimitIntervalSec=300",
     "StartLimitBurst=5",
     "",
@@ -382,13 +302,16 @@ export function renderCertbotDeployHook(input, {
   certificateGroup = "certread",
 } = {}) {
   const manifest = normalizeManifest(input);
+  assertPublicIngress(manifest, "Certbot hook rendering");
   const binary = absolutePath(executable, "executable");
   const config = absolutePath(configPath, "configPath");
   const service = unit(caddyUnit, "caddyUnit");
   const certGroup = account(certificateGroup, "certificateGroup");
   const hosts = [...new Set([
     ...(manifest.spec.edge.existingSites ?? []).map((site) => site.host),
-    ...manifest.spec.services.flatMap((item) => item.domains),
+    ...manifest.spec.services
+      .filter((item) => (item.exposure ?? "public") === "public")
+      .flatMap((item) => item.domains),
   ])].sort();
   const lineageCases = hosts.map((host) => `/etc/letsencrypt/live/${host}`).join("|");
   return `#!/usr/bin/env bash
@@ -418,6 +341,7 @@ export function renderPortRedirectHelper(input, {
   // same native interface as the transaction instead of inferring an empty
   // ruleset from that compatibility failure.
   const manifest = normalizeManifest(input);
+  assertPublicIngress(manifest, "Port redirect helper rendering");
   const httpPort = manifest.spec.edge.httpPort;
   const httpsPort = manifest.spec.edge.httpsPort;
   const ownershipTag = `lazyedge-${manifestDigest(manifest).slice(0, 16)}`;
@@ -742,10 +666,13 @@ export function renderPortRedirectSystemd(input, {
   preservedProbeHost,
 } = {}) {
   const manifest = normalizeManifest(input);
+  assertPublicIngress(manifest, "Port redirect systemd rendering");
   const helper = absolutePath(helperPath, "helperPath");
   const caddy = unit(caddyUnit, "caddyUnit");
   const preservedHosts = (manifest.spec.edge.existingSites ?? []).map((site) => site.host);
-  const managedHosts = manifest.spec.services.flatMap((service) => service.domains);
+  const managedHosts = manifest.spec.services
+    .filter((service) => (service.exposure ?? "public") === "public")
+    .flatMap((service) => service.domains);
   const probeHosts = [...new Set([...preservedHosts, ...managedHosts])];
   const probeHost = preservedProbeHost ?? probeHosts[0];
   if (typeof probeHost !== "string" || !probeHosts.includes(probeHost)) {
@@ -797,17 +724,22 @@ export function renderSystemdBundle(input, { mode = "root" } = {}) {
   if (!new Set(["root", "user", "all"]).has(mode)) {
     throw new SecurityError("systemd render mode must be root, user, or all");
   }
+  const hasPublicIngress = (manifest.spec.edge.existingSites?.length ?? 0) > 0
+    || manifest.spec.services.some(
+      (service) => (service.exposure ?? "public") === "public",
+    );
   const root = Object.freeze({
-    "lazyedge-edge.service": renderEdgeSystemd(input),
-    ...(manifest.spec.services.some((service) => service.chat !== undefined)
-      ? { "lazyedge-chat.service": renderChatSystemd(input) }
+    "lazyedge-edge.service": renderEdgeSystemd(manifest),
+    ...(hasPublicIngress
+      ? {
+        "lazyedge-caddy.service": renderCaddySystemd(manifest),
+        "lazyedge-port-redirect.service": renderPortRedirectSystemd(manifest),
+      }
       : {}),
-    "lazyedge-caddy.service": renderCaddySystemd(input),
-    "lazyedge-port-redirect.service": renderPortRedirectSystemd(input),
   });
   const user = Object.freeze({
-    "lazyedge-worker.service": renderWorkerSystemd(input),
-    "lazyedge-tunnel.service": renderTunnelSystemd(input),
+    "lazyedge-worker.service": renderWorkerSystemd(manifest),
+    "lazyedge-tunnel.service": renderTunnelSystemd(manifest),
   });
   if (mode === "root") return root;
   if (mode === "user") return user;

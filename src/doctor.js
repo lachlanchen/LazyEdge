@@ -39,6 +39,12 @@ export function planDoctorChecks(input, {
         description: `Reverse tunnel listener for ${service.id} is connected`,
       }));
     }
+    for (const privateListener of manifest.spec.edge.privateListeners ?? []) {
+      checks.push(check(`edge-private-listener-${privateListener.service}`, "tcp", {
+        listener: privateListener.listen,
+        description: `Authenticated private listener for ${privateListener.service} is accepting loopback traffic`,
+      }));
+    }
     if (paths.edgeManifest) checks.push(check("edge-manifest-mode", "file-mode", {
       path: paths.edgeManifest,
       allowedModes: [0o600, 0o640],

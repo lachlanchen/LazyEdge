@@ -16,6 +16,14 @@ function assertHighPort(value, label) {
   return value;
 }
 
+function assertPublicIngress(manifest, label) {
+  const hasPublicIngress = (manifest.spec.edge.existingSites?.length ?? 0) > 0
+    || manifest.spec.services.some((service) => (service.exposure ?? "public") === "public");
+  if (!hasPublicIngress) {
+    throw new SecurityError(`${label} requires at least one configured public site`);
+  }
+}
+
 function exactLoopback(value, label) {
   const listener = normalizeLoopbackListener(value, label);
   if (listener.host !== "127.0.0.1") {
@@ -106,7 +114,6 @@ function certificateFor(host, manualCertificates) {
 function renderReverseProxy(upstream, {
   tlsServerName,
   dropHeaders = [],
-  clientAddressHeader = false,
 } = {}, indent = "    ") {
   const lines = [
     `${indent}reverse_proxy ${upstream} {`,
@@ -117,11 +124,6 @@ function renderReverseProxy(upstream, {
       throw new SecurityError("Dropped proxy header name is invalid");
     }
     lines.push(`${indent}    header_up -${header}`);
-  }
-  if (clientAddressHeader) {
-    // The chat BFF is loopback-only and trusts this value solely because Caddy
-    // overwrites any client-supplied header at the ingress boundary.
-    lines.push(`${indent}    header_up X-LazyEdge-Client-Address {remote_host}`);
   }
   if (tlsServerName !== undefined) {
     lines.push(
@@ -168,59 +170,19 @@ function renderLandingRoute(indent = "    ") {
   ].join("\n");
 }
 
-function renderChatRoutes(listener, indent = "    ") {
-  const upstream = `http://${exactLoopback(listener, "chat listener")}`;
-  return [
-    `${indent}@lazyedge_chat_document {`,
-    `${indent}    method GET HEAD`,
-    `${indent}    path / /manifest.webmanifest /sw.js /assets/app.css /assets/app.js /assets/markdown.js /assets/katex.mjs /assets/icon-192.png /assets/icon-512.png`,
-    `${indent}}`,
-    `${indent}handle @lazyedge_chat_document {`,
-    renderReverseProxy(
-      upstream,
-      { dropHeaders: ["Authorization"], clientAddressHeader: true },
-      `${indent}    `,
-    ),
-    `${indent}}`,
-    `${indent}@lazyedge_chat_read {`,
-    `${indent}    method GET`,
-    `${indent}    path /chat/api/session /chat/api/models`,
-    `${indent}}`,
-    `${indent}handle @lazyedge_chat_read {`,
-    renderReverseProxy(
-      upstream,
-      { dropHeaders: ["Authorization"], clientAddressHeader: true },
-      `${indent}    `,
-    ),
-    `${indent}}`,
-    `${indent}@lazyedge_chat_write {`,
-    `${indent}    method POST`,
-    `${indent}    path /chat/api/login /chat/api/logout /chat/api/completions`,
-    `${indent}}`,
-    `${indent}handle @lazyedge_chat_write {`,
-    renderReverseProxy(
-      upstream,
-      { dropHeaders: ["Authorization"], clientAddressHeader: true },
-      `${indent}    `,
-    ),
-    `${indent}}`,
-  ].join("\n");
-}
-
 function renderSite(host, upstream, {
   tlsServerName,
   certificate,
   acmeWebroot,
   landing = false,
-  chat,
   managed = false,
 } = {}) {
   if (certificate === undefined) {
-    if (landing || chat !== undefined) {
+    if (landing) {
       return [
         `${host} {`,
         "    import lazyedge_common",
-        ...(chat === undefined ? [renderLandingRoute()] : [renderChatRoutes(chat.listen)]),
+        renderLandingRoute(),
         "    handle {",
         renderReverseProxy(
           upstream,
@@ -262,9 +224,7 @@ function renderSite(host, upstream, {
     `        root * ${webroot}`,
     "        file_server",
     "    }",
-    ...(chat === undefined
-      ? (landing ? [renderLandingRoute()] : [])
-      : [renderChatRoutes(chat.listen)]),
+    ...(landing ? [renderLandingRoute()] : []),
     "    handle {",
     renderReverseProxy(
       upstream,
@@ -282,6 +242,7 @@ export function renderCaddy(input, {
   acmeWebroot = "/var/www/letsencrypt",
 } = {}) {
   const manifest = normalizeManifest(input);
+  assertPublicIngress(manifest, "Caddy rendering");
   const httpPort = assertHighPort(manifest.spec.edge.httpPort, "spec.edge.httpPort");
   const httpsPort = assertHighPort(manifest.spec.edge.httpsPort, "spec.edge.httpsPort");
   if (httpPort === httpsPort) {
@@ -292,15 +253,10 @@ export function renderCaddy(input, {
   const existingHosts = new Set(existingSites.map((site) => site.host));
   const managedSites = new Map();
   for (const service of manifest.spec.services) {
+    if ((service.exposure ?? "public") !== "public") continue;
     for (const host of service.domains) {
-      const current = managedSites.get(host) ?? { landing: false, chat: undefined };
+      const current = managedSites.get(host) ?? { landing: false };
       if (service.profile === LOCALLLM_OPENAI_PROFILE) current.landing = true;
-      if (service.chat !== undefined) {
-        if (current.chat !== undefined) {
-          throw new SecurityError(`More than one private chat claims host ${host}`);
-        }
-        current.chat = service.chat;
-      }
       managedSites.set(host, current);
     }
   }
@@ -344,7 +300,6 @@ export function renderCaddy(input, {
       certificate: certificateFor(host, manualCertificates),
       acmeWebroot,
       landing: managedSites.get(host).landing,
-      chat: managedSites.get(host).chat,
       managed: true,
     },
   )).join("");
@@ -447,6 +402,7 @@ export function renderNftRedirectTransaction(input, {
   previousHttpsPort = 8443,
 } = {}) {
   const manifest = normalizeManifest(input);
+  assertPublicIngress(manifest, "NAT redirect rendering");
   const { http, https } = caddyPorts(input);
   const ownershipTag = `lazyedge-${manifestDigest(manifest).slice(0, 16)}`;
   return Object.freeze({

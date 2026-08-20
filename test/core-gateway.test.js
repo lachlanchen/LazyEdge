@@ -101,6 +101,20 @@ function request(url, requestPath, {
   });
 }
 
+async function within(promise, milliseconds, message) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), milliseconds);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function createStack(handler, limits = {}) {
   const upstream = await startHttpServer(handler);
   const relayToken = generateCapabilityToken("relay");
@@ -400,6 +414,153 @@ test("SSE is streamed immediately and client cancellation reaches local compute"
   }
 });
 
+test("worker close and abort are bounded, idempotent, and release the exact listener", async () => {
+  let streamClosedResolve;
+  const streamClosed = new Promise((resolve) => { streamClosedResolve = resolve; });
+  let uploadStartedResolve;
+  const uploadStarted = new Promise((resolve) => { uploadStartedResolve = resolve; });
+  let uploadClosedResolve;
+  const uploadClosed = new Promise((resolve) => { uploadClosedResolve = resolve; });
+  const upstream = await startHttpServer((incoming, response) => {
+    if (incoming.url === "/v1/chat/completions") {
+      incoming.resume();
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      response.write("data: first\n\n");
+      response.once("close", streamClosedResolve);
+      return;
+    }
+    if (incoming.url === "/v1/embeddings") {
+      uploadStartedResolve();
+      incoming.once("close", uploadClosedResolve);
+      incoming.resume();
+      return;
+    }
+    incoming.resume();
+    incoming.once("end", () => response.end("healthy"));
+  });
+  const unrelated = await startHttpServer((incoming, response) => {
+    incoming.resume();
+    response.end("unrelated-ok");
+  });
+  const relayToken = generateCapabilityToken("relay");
+  const upstreamToken = generateCapabilityToken("upstream");
+  const manifest = createManifest({
+    workerTarget: upstream.url,
+    edgeUpstream: "http://127.0.0.1:19999",
+  });
+  let first;
+  let second;
+  let third;
+  let streamRequest;
+  let uploadRequest;
+  try {
+    first = await startWorkerServer({
+      manifest,
+      relayToken,
+      upstreamToken,
+      listen: "127.0.0.1:0",
+    });
+    const workerPort = first.address.port;
+    const streamTarget = new URL(first.url);
+    await within(new Promise((resolve, reject) => {
+      let started = false;
+      streamRequest = http.request({
+        hostname: streamTarget.hostname,
+        port: streamTarget.port,
+        path: "/v1/chat/completions",
+        method: "POST",
+        headers: {
+          "content-length": "0",
+          [RELAY_HEADER]: `Bearer ${relayToken}`,
+        },
+        agent: false,
+      }, (incoming) => {
+        incoming.on("error", (error) => {
+          if (!started) reject(error);
+        });
+        incoming.once("data", (chunk) => {
+          started = true;
+          assert.match(chunk.toString("utf8"), /data: first/u);
+          resolve();
+        });
+      });
+      streamRequest.on("error", (error) => {
+        if (!started) reject(error);
+      });
+      streamRequest.end();
+    }), 1_000, "worker SSE did not start");
+
+    const firstClose = first.close();
+    assert.equal(first.close(), firstClose);
+    await within(firstClose, 1_000, "worker close waited on active SSE");
+    await within(streamClosed, 1_000, "worker close did not abort upstream SSE");
+
+    const abortController = new AbortController();
+    second = await startWorkerServer({
+      manifest,
+      relayToken,
+      upstreamToken,
+      listen: `127.0.0.1:${workerPort}`,
+      signal: abortController.signal,
+    });
+    assert.equal(second.address.port, workerPort);
+
+    const uploadTarget = new URL(second.url);
+    let uploadClientClosedResolve;
+    const uploadClientClosed = new Promise((resolve) => { uploadClientClosedResolve = resolve; });
+    uploadRequest = http.request({
+      hostname: uploadTarget.hostname,
+      port: uploadTarget.port,
+      path: "/v1/embeddings",
+      method: "POST",
+      headers: { [RELAY_HEADER]: `Bearer ${relayToken}` },
+      agent: false,
+    }, (incoming) => {
+      incoming.resume();
+      incoming.on("error", () => {});
+    });
+    uploadRequest.on("error", uploadClientClosedResolve);
+    uploadRequest.on("close", uploadClientClosedResolve);
+    uploadRequest.write("partial");
+    await within(uploadStarted, 1_000, "incomplete upload did not reach the worker target");
+
+    abortController.abort();
+    const abortedClose = second.close();
+    assert.equal(second.close(), abortedClose);
+    await within(abortedClose, 1_000, "worker abort waited on incomplete upload");
+    await within(uploadClosed, 1_000, "worker abort did not close upstream upload");
+    await within(uploadClientClosed, 1_000, "worker abort did not close its client");
+
+    third = await startWorkerServer({
+      manifest,
+      relayToken,
+      upstreamToken,
+      listen: `127.0.0.1:${workerPort}`,
+    });
+    assert.equal(third.address.port, workerPort);
+    const recovered = await request(third.url, "/healthz", {
+      headers: { [RELAY_HEADER]: `Bearer ${relayToken}` },
+    });
+    assert.equal(recovered.status, 200);
+    assert.equal(recovered.body, "healthy");
+
+    assert.equal(unrelated.server.listening, true);
+    const unaffected = await request(unrelated.url, "/still-running");
+    assert.equal(unaffected.status, 200);
+    assert.equal(unaffected.body, "unrelated-ok");
+  } finally {
+    streamRequest?.destroy();
+    uploadRequest?.destroy();
+    await Promise.allSettled([
+      third?.close(),
+      second?.close(),
+      first?.close(),
+    ]);
+    await upstream.close();
+    await unrelated.close();
+  }
+});
+
 test("worker requires the relay capability and keeps health private", async () => {
   let observedAuthorization;
   const stack = await createStack((incoming, response) => {
@@ -454,6 +615,59 @@ test("an unavailable reverse tunnel returns 503 without exposing details", async
   }
 });
 
+test("compatibility direct API is manifest-authoritative for service and listener", async () => {
+  const configured = createManifest({
+    workerTarget: "http://127.0.0.1:18008",
+    edgeUpstream: "http://127.0.0.1:19001",
+  });
+  configured.spec.edge.compatibilityService = "localllm";
+
+  for (const listen of ["127.0.0.1:0", "127.0.0.2:18789", undefined]) {
+    await assert.rejects(
+      startCompatibilityServer({
+        manifest: configured,
+        serviceId: "localllm",
+        listen,
+      }),
+      /listen overrides are forbidden/u,
+    );
+  }
+
+  const missingListener = structuredClone(configured);
+  delete missingListener.spec.edge.compatibilityListen;
+  delete missingListener.spec.edge.compatibilityService;
+  await assert.rejects(
+    startCompatibilityServer({ manifest: missingListener, serviceId: "localllm" }),
+    /compatibilityListen is required/u,
+  );
+
+  const wrongService = structuredClone(configured);
+  const second = structuredClone(wrongService.spec.services[0]);
+  second.id = "other-service";
+  second.domains = ["other.example.test"];
+  second.edge.upstream = "http://127.0.0.1:19003";
+  second.worker.listen = "127.0.0.1:19004";
+  second.worker.target = "http://127.0.0.1:18009";
+  second.public.tokenSet = "other-users";
+  wrongService.spec.services.push(second);
+  await assert.rejects(
+    startCompatibilityServer({ manifest: wrongService, serviceId: "other-service" }),
+    /must equal spec\.edge\.compatibilityService/u,
+  );
+
+  const privateService = structuredClone(configured);
+  privateService.spec.services[0].exposure = "private";
+  privateService.spec.services[0].domains = [];
+  privateService.spec.edge.privateListeners = [{
+    service: "localllm",
+    listen: "127.0.0.1:18120",
+  }];
+  await assert.rejects(
+    startCompatibilityServer({ manifest: privateService, serviceId: "localllm" }),
+    /public service/u,
+  );
+});
+
 test("loopback compatibility listener ignores Host without weakening route auth", async () => {
   const paths = [];
   const stack = await createStack((incoming, response) => {
@@ -461,14 +675,20 @@ test("loopback compatibility listener ignores Host without weakening route auth"
     incoming.resume();
     response.end(incoming.url === "/healthz" ? "healthy" : "model-list");
   });
+  const reservation = await startHttpServer((_incoming, response) => response.end());
+  const compatibilityPort = reservation.server.address().port;
+  await reservation.close();
+  const compatibilityManifest = structuredClone(stack.manifest);
+  compatibilityManifest.spec.edge.compatibilityListen = `127.0.0.1:${compatibilityPort}`;
+  compatibilityManifest.spec.edge.compatibilityService = "localllm";
   const compatibility = await startCompatibilityServer({
-    manifest: stack.manifest,
+    manifest: compatibilityManifest,
     serviceId: "localllm",
     tokenStore: stack.tokenStore,
     relayToken: stack.relayToken,
-    listen: "127.0.0.1:0",
   });
   try {
+    assert.equal(compatibility.address.port, compatibilityPort);
     const health = await request(compatibility.url, "/healthz", {
       headers: { host: "localhost-only.invalid" },
     });

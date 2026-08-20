@@ -11,9 +11,9 @@ spec:
     httpPort: 10080
     httpsPort: 10443
     existingSites:
-      - host: chat.example.com
+      - host: app.example.com
         upstream: https://127.0.0.1:8443
-        tlsServerName: chat.example.com
+        tlsServerName: app.example.com
 
   transport:
     provider: openssh-reverse
@@ -32,17 +32,6 @@ spec:
         listen: 127.0.0.1:17800
         target: http://127.0.0.1:8008
         healthPath: /healthz
-      # Optional private browser chat. On an existing digest-owned deployment,
-      # add this only to a separate /etc/lazyedge-chat/lazyedge.yaml overlay;
-      # never replace the primary manifest or re-render NAT implicitly.
-      # chat:
-      #   listen: 127.0.0.1:17610
-      #   username: operator
-      #   defaultModel: deep
-      #   models:
-      #     deep: localllm-deep
-      #     fast: localllm-fast
-      #     code: localllm-code
       public:
         tokenSet: local-llm-users
         maxBodyBytes: 33554432

@@ -8,10 +8,10 @@ Start with the [quickstart](quickstart.md), then read the [architecture](archite
 | [Configuration](configuration.md) | Understand the manifest and secret stores |
 | [Architecture](architecture.md) | Follow a request from the public edge to a private worker |
 | [Security](security.md) | Threat model, invariants, credentials, and limitations |
-| [Private chat](private-chat.md) | Optional ChatGPT-style LocalLLM UI, credentials, and overlay upgrade |
+| [Private service listeners](private-service-listeners.md) | Authenticated application-neutral cloud-local ingress without DNS or Caddy exposure |
 | [Operations](operations.md) | Install, observe, rotate, update, and roll back |
 | [Migration](migration.md) | Move or duplicate an edge without moving private compute |
-| [LocalLLM + AgInTi](integrations/local-llm-aginti.md) | Keep models local while agents use a stable HTTPS endpoint |
+| [OpenAI-compatible clients](integrations/openai-compatible-clients.md) | Keep inference private behind an exact, authenticated HTTPS contract |
 | [Troubleshooting](troubleshooting.md) | Diagnose DNS, TLS, tunnel, guard, and upstream failures |
 | [Concepts at scale](concepts-at-scale.md) | Learn how LazyEdge relates to load balancers, overlays, Kubernetes, and service meshes |
 

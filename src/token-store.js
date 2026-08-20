@@ -58,7 +58,7 @@ function normalizeStringSet(value, label, mapper) {
   if (new Set(mapped).size !== mapped.length) {
     throw new SecurityError(`${label} contains duplicates`, { code: "DUPLICATE_CLAIM" });
   }
-  return mapped.sort();
+  return Object.freeze(mapped.sort());
 }
 
 export function normalizeTokenScope(scope) {
