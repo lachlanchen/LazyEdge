@@ -34,7 +34,7 @@ flowchart LR
 - **Transporte sustituible:** OpenSSH primero; el contrato de aplicación permanece desacoplado de futuros transportes WireGuard, rathole o frp.
 - **Borde migrable:** genera el mismo proyecto revisado en una segunda nube, conéctalo en paralelo, pruébalo y después mueve DNS.
 
-LazyEdge ocupa un espacio parecido al de un túnel inverso estilo ngrok, pero es deliberadamente más estrecho: la vista previa v0.2 publica rutas HTTP API revisadas, no puertos TCP arbitrarios ni URL públicas improvisadas. Consulta [conceptos a escala](../docs/concepts-at-scale.md) para ver el mapa tecnológico.
+LazyEdge ocupa un espacio parecido al de un túnel inverso estilo ngrok, pero es deliberadamente más estrecho: la vista previa v0.3 publica rutas HTTP API revisadas, no puertos TCP arbitrarios ni URL públicas improvisadas. Consulta [conceptos a escala](../docs/concepts-at-scale.md) para ver el mapa tecnológico.
 
 ## Inicio rápido
 
@@ -67,7 +67,7 @@ Separa los enlaces por límite de confianza: coloca el [ejemplo del borde](../ex
 
 Tras el arranque, ejecuta `doctor --role edge` en la nube y `doctor --role worker` en el cómputo privado; usa `all` solo si ambos roles comparten realmente el host. Los comandos de root `render redirect-helper` y `render nat --direction apply|rollback` imprimen artefactos de revisión con etiquetas de propiedad derivadas del resumen del manifiesto; nunca ejecutan un cambio de firewall. Consulta [operaciones](../docs/operations.md).
 
-La interfaz `v1alpha1` está en vista previa. La versión 0.2 no incluye `apply`, `rollback` ni `uninstall` remotos: los generadores escriben artefactos revisables y un administrador los instala de forma deliberada. Consulta el [inicio rápido completo](../docs/quickstart.md).
+La interfaz `v1alpha1` está en vista previa. La versión 0.3 no incluye `apply`, `rollback` ni `uninstall` remotos: los generadores escriben artefactos revisables y un administrador los instala de forma deliberada. Consulta el [inicio rápido completo](../docs/quickstart.md).
 
 ## Contenido
 
@@ -119,6 +119,6 @@ Si usas LazyEdge en una investigación, cita el repositorio. GitHub lee [CITATIO
 
 ## Estado
 
-**Vista previa v0.2.** La interfaz pública puede cambiar. Este repositorio describe la base segura prevista; no afirma que un dominio, servidor, túnel, versión npm o despliegue LocalLLM concreto esté activo hasta verificar ese entorno de manera independiente. No uses LazyEdge como único control para sistemas sensibles o críticos para la seguridad física.
+**Vista previa v0.3.** La interfaz pública puede cambiar. Este repositorio describe la base segura prevista; no afirma que un dominio, servidor, túnel, versión npm o despliegue LocalLLM concreto esté activo hasta verificar ese entorno de manera independiente. No uses LazyEdge como único control para sistemas sensibles o críticos para la seguridad física.
 
 MIT © [Lachlan Chen](https://github.com/lachlanchen)

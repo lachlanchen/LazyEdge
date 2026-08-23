@@ -34,7 +34,7 @@ flowchart LR
 - **可替換傳輸層：** 先採用 OpenSSH；應用程式契約與未來的 WireGuard、rathole 或 frp 傳輸解耦。
 - **可遷移邊緣：** 在第二個雲端產生同一份已審查專案，平行連線並測試後再切換 DNS。
 
-LazyEdge 與 ngrok 式反向通道處理相似問題，但刻意縮小範圍：v0.2 預覽只公開經過審查的 HTTP API 路由，不開放任意 TCP 連接埠，也不產生臨時公開 URL。請閱讀[大規模系統概念](../docs/concepts-at-scale.md)了解技術全貌。
+LazyEdge 與 ngrok 式反向通道處理相似問題，但刻意縮小範圍：v0.3 預覽只公開經過審查的 HTTP API 路由，不開放任意 TCP 連接埠，也不產生臨時公開 URL。請閱讀[大規模系統概念](../docs/concepts-at-scale.md)了解技術全貌。
 
 ## 快速開始
 
@@ -67,7 +67,7 @@ npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 
 啟動後，請在雲端執行 `doctor --role edge`，在私有運算主機執行 `doctor --role worker`；只有兩個角色確實位於同一主機時才使用 `all`。root 專用的 `render redirect-helper` 與 `render nat --direction apply|rollback` 只輸出帶清單摘要所有權標籤的審查成果，絕不執行防火牆變更。詳見[維運](../docs/operations.md)。
 
-`v1alpha1` 介面仍是預覽版。0.2 版不提供遠端 `apply`、`rollback` 或 `uninstall`；轉譯器只輸出可審查的成果，由管理員有意識地安裝。詳見[完整快速入門](../docs/quickstart.md)。
+`v1alpha1` 介面仍是預覽版。0.3 版不提供遠端 `apply`、`rollback` 或 `uninstall`；轉譯器只輸出可審查的成果，由管理員有意識地安裝。詳見[完整快速入門](../docs/quickstart.md)。
 
 ## 目前內容
 
@@ -119,6 +119,6 @@ git diff --check
 
 ## 狀態
 
-**v0.2 預覽版。** 公開介面可能變動。本儲存庫描述預期的安全基準；在獨立驗證具體環境以前，不會聲稱任何特定網域、雲端伺服器、通道、npm 版本或 LocalLLM 部署已經上線。不要把 LazyEdge 當成敏感或安全關鍵系統的唯一防護。
+**v0.3 預覽版。** 公開介面可能變動。本儲存庫描述預期的安全基準；在獨立驗證具體環境以前，不會聲稱任何特定網域、雲端伺服器、通道、npm 版本或 LocalLLM 部署已經上線。不要把 LazyEdge 當成敏感或安全關鍵系統的唯一防護。
 
 MIT © [Lachlan Chen](https://github.com/lachlanchen)

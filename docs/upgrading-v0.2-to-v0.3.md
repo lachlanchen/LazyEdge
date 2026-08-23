@@ -1,11 +1,12 @@
-# Upgrade from v0.2 to the proposed transport-only v0.3
+# Upgrade from v0.2 to transport-only v0.3
 
 ## Status and scope
 
-This guide describes an **unreleased pull-request candidate** for a future
-transport-only v0.3. It is not evidence that v0.3 has been merged, published,
-or deployed. Use the exact reviewed commit and package checksum during a
-rehearsal; do not substitute a moving branch, tag, symlink, or unpinned `npx`.
+This guide describes the transport-only v0.3 release line. Its presence is not
+evidence that an exact v0.3 package has been published or deployed. Verify the
+Git commit, registry version, package checksum and running immutable path at
+each checkpoint; do not substitute a moving branch, tag, symlink or unpinned
+`npx`.
 
 The candidate keeps LazyEdge responsible for authenticated, bounded transport.
 The v0.2 private-chat BFF, browser assets, sessions, service-worker cache,
@@ -140,12 +141,74 @@ new redirect helper over rules owned by another digest, and do not use a
 firewall change to solve an application-routing problem. Preserve the accepted
 Caddy and NAT artifacts when neither boundary needs to change.
 
+## Repair provenance drift before the v0.3 promotion
+
+Do not restart a process merely because its launcher now resolves to a reviewed
+package. A long-running Node.js process can still be executing code loaded from
+an older release, while its unit and stable symlink already name a newer one.
+Record all three identities independently: the running process start time and
+arguments, the unit's effective `ExecStart`, and the current symlink target.
+
+If the exact artifact executing in either role is absent, the current state is
+not an executable rollback target. Before v0.3, establish a reproducible bridge
+release on both roles:
+
+1. obtain one exact prior package and verify its checksum and installed file
+   list independently on the edge and worker;
+2. render edge and worker units with that release's absolute executable path,
+   never a shared moving launcher;
+3. retain the pre-change unit bytes and a controller that restores both the
+   unit and executable path and restarts that exact role;
+4. promote and probe the bridge release in a controlled window, one role at a
+   time, including positive, negative, streaming and bounded-outage checks;
+5. record the resulting process identities as the immediately previous
+   reproducible release for v0.3.
+
+A source tag is insufficient if its packed bytes cannot be proven identical to
+the missing deployed artifact. Do not label a different patch release as the
+exact prior runtime; it can be a reviewed bridge or fallback only after its own
+acceptance.
+
+## Stage and promote both transport roles
+
+Build one v0.3.0 tarball from the reviewed release commit, audit its file list,
+and record its SHA-256. Install those exact bytes into new checksum-named
+directories on both hosts. Verify the CLI version and complete installed file
+hashes under each service manager's account. Render candidate units with the
+immutable executable paths and retain the complete previous unit bytes.
+
+First rehearse the candidate without public cutover. Use a separate manifest
+whose edge, reverse and worker listeners are unused loopback ports; the
+candidate tunnel must use only those separate ports. Start at most one
+candidate worker, tunnel and edge for that manifest, then run the positive and
+negative contract matrix. Stop the rehearsal stack after evidence capture.
+
+During promotion, keep Caddy, NAT and tunnel configuration unchanged unless the
+reviewed manifest requires a boundary change. Promote the worker unit to the
+immutable v0.3 path and prove the existing edge path still works. Then promote
+the edge unit and repeat edge-local and public probes. Retarget a convenience
+launcher only after every remaining consumer, especially a legacy chat unit,
+is pinned elsewhere or retired. Never leave one role on an unidentified
+runtime and call the pair v0.3.
+
+The transport rollback controller must restore and restart the failed runtime,
+not only rewrite symlinks. For an edge failure, restore the previous edge unit
+and immutable executable, restart only the edge, and re-probe before touching
+the worker. For a worker failure, restore the previous worker unit and
+immutable executable, restart only the worker, confirm exactly one worker and
+tunnel own their expected listeners, and re-probe through the edge. Restart
+the tunnel only when its reviewed unit or SSH configuration changed. Caddy and
+NAT use their separately retained rollback artifacts and are not part of a
+code-only transport rollback.
+
 ## Candidate acceptance and rollback
 
 Before promotion, require all of the following:
 
 - exact candidate commit, package checksum, manifest digest, and immutable
   edge/worker executable paths are recorded;
+- the immediately previous edge and worker packages and unit bytes are present,
+  reproducible, and their rollback controllers restart the restored runtimes;
 - validation, plan, doctor, unit verification, and direct high-port probes pass
   separately on each role;
 - edge and worker use only their role-specific bindings; negative startup

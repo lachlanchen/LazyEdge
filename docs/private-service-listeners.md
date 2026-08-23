@@ -2,10 +2,10 @@
 
 ## Status
 
-This page documents an unreleased pull-request implementation proposed for a
-future transport-only v0.3. It is not part of the published v0.2.0 package.
-Merge, documentation, and test evidence do not mean release or deployment, and
-must not be cited as production acceptance evidence.
+This page documents the transport-only v0.3 contract. It is not part of the
+published v0.2.0 package. Source metadata, a Git tag, package publication and
+deployment are separate checkpoints; none may be cited as production
+acceptance without verification of the exact artifact in that environment.
 
 ## Problem
 

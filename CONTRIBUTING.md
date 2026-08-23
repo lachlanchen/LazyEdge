@@ -33,13 +33,21 @@ npm run publish:npm:current
 
 Recovery refuses a dirty tree, a non-`main` branch, a mismatched package lock, a tag that does not point at `HEAD`, or a `HEAD` subject other than the exact release message. If npm already contains that version, recovery skips republishing and continues exact install verification and the pending push.
 
-This local helper is the canonical release path unless the maintainers have
-explicitly configured npm trusted publishing for this repository. Manual
-dispatch of `.github/workflows/publish.yml` validates only and can never
-publish. A stable GitHub Release may publish through trusted OIDC only when its
-tag, commit, package lock, and `CITATION.cff` all match and the version is still
-unpublished. Never publish a GitHub Release for a version already sent by the
-local helper; that workflow will fail closed rather than republish it.
+This local helper is the canonical path only for forks that have not configured
+npm trusted publishing, or for recovering a version that the same helper
+already checkpointed. The upstream `lachlanchen/LazyEdge` repository is
+configured to use `.github/workflows/publish.yml`; its v0.3.0 and later releases
+must use one path only: an accepted stable GitHub Release triggers trusted OIDC
+publication with provenance. Do not run either local publishing command for an
+upstream OIDC release.
+
+Manual dispatch of the workflow validates only and can never publish. A stable
+GitHub Release may publish through trusted OIDC only when its tag, commit,
+package lock, and `CITATION.cff` all match and the version is still unpublished.
+If that job fails, preserve and retry the same commit, tag, and version after
+repairing the trust mapping. Never switch to the local helper or publish a
+second release checkpoint; the workflow fails closed rather than republishing
+an existing registry version.
 
 ## Packed CLI and user services
 

@@ -10,7 +10,8 @@ Start with the [quickstart](quickstart.md), then read the [architecture](archite
 | [Security](security.md) | Threat model, invariants, credentials, and limitations |
 | [Private service listeners](private-service-listeners.md) | Authenticated application-neutral cloud-local ingress without DNS or Caddy exposure |
 | [Operations](operations.md) | Install, observe, rotate, update, and roll back |
-| [Upgrade v0.2 to proposed v0.3](upgrading-v0.2-to-v0.3.md) | Separate legacy private chat from transport without losing rollback or external application routes |
+| [Upgrade v0.2 to v0.3](upgrading-v0.2-to-v0.3.md) | Separate legacy private chat from transport without losing rollback or external application routes |
+| [v0.3.0 release notes](releases/v0.3.0.md) | Review the breaking application split, private-listener contract, and release boundaries |
 | [Migration](migration.md) | Move or duplicate an edge without moving private compute |
 | [OpenAI-compatible clients](integrations/openai-compatible-clients.md) | Keep inference private behind an exact, authenticated HTTPS contract |
 | [Troubleshooting](troubleshooting.md) | Diagnose DNS, TLS, tunnel, guard, and upstream failures |

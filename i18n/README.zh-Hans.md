@@ -34,7 +34,7 @@ flowchart LR
 - **可替换传输层：** 首先支持 OpenSSH；应用契约与未来的 WireGuard、rathole 或 frp 传输解耦。
 - **可迁移边缘：** 在第二个云上渲染同一份已审查项目，并行连接并测试，然后再切换 DNS。
 
-LazyEdge 与 ngrok 式反向隧道解决相似问题，但有意缩小范围：v0.2 预览只公开经过审查的 HTTP API 路由，不开放任意 TCP 端口，也不生成临时公网 URL。请阅读[大规模系统概念](../docs/concepts-at-scale.md)了解技术全貌。
+LazyEdge 与 ngrok 式反向隧道解决相似问题，但有意缩小范围：v0.3 预览只公开经过审查的 HTTP API 路由，不开放任意 TCP 端口，也不生成临时公网 URL。请阅读[大规模系统概念](../docs/concepts-at-scale.md)了解技术全貌。
 
 ## 快速开始
 
@@ -67,7 +67,7 @@ npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 
 启动后，请在云端运行 `doctor --role edge`，在私有计算机运行 `doctor --role worker`；只有两个角色确实位于同一主机时才使用 `all`。root 专用的 `render redirect-helper` 与 `render nat --direction apply|rollback` 只输出带清单摘要所有权标签的审查产物，绝不会执行防火墙变更。详见[运维](../docs/operations.md)。
 
-`v1alpha1` 接口仍处于预览阶段。0.2 版不提供远程 `apply`、`rollback` 或 `uninstall`；渲染器只输出可审查的产物，由管理员有意识地安装。详见[完整快速上手](../docs/quickstart.md)。
+`v1alpha1` 接口仍处于预览阶段。0.3 版不提供远程 `apply`、`rollback` 或 `uninstall`；渲染器只输出可审查的产物，由管理员有意识地安装。详见[完整快速上手](../docs/quickstart.md)。
 
 ## 当前内容
 
@@ -119,6 +119,6 @@ git diff --check
 
 ## 状态
 
-**v0.2 预览版。** 公共接口可能变化。本仓库描述预期的安全基线；在独立验证具体环境之前，不会宣称任何特定域名、云服务器、隧道、npm 版本或 LocalLLM 部署已经上线。不要把 LazyEdge 作为敏感或安全关键系统的唯一防护。
+**v0.3 预览版。** 公共接口可能变化。本仓库描述预期的安全基线；在独立验证具体环境之前，不会宣称任何特定域名、云服务器、隧道、npm 版本或 LocalLLM 部署已经上线。不要把 LazyEdge 作为敏感或安全关键系统的唯一防护。
 
 MIT © [Lachlan Chen](https://github.com/lachlanchen)

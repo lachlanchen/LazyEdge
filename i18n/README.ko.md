@@ -34,7 +34,7 @@ flowchart LR
 - **교체 가능한 전송 계층:** 먼저 OpenSSH를 사용하고 애플리케이션 계약은 향후 WireGuard, rathole, frp 전송과 분리합니다.
 - **이전 가능한 엣지:** 동일하게 검토된 프로젝트를 두 번째 클라우드에 렌더링하고 병렬 연결로 시험한 뒤 DNS를 옮깁니다.
 
-LazyEdge는 ngrok형 역방향 터널과 같은 문제 영역을 다루지만 의도적으로 범위가 더 좁습니다. v0.2 미리보기는 검토된 HTTP API 경로만 공개하며 임의의 TCP 포트나 즉석 공개 URL을 제공하지 않습니다. 기술 지형은 [대규모 개념](../docs/concepts-at-scale.md)을 참고하세요.
+LazyEdge는 ngrok형 역방향 터널과 같은 문제 영역을 다루지만 의도적으로 범위가 더 좁습니다. v0.3 미리보기는 검토된 HTTP API 경로만 공개하며 임의의 TCP 포트나 즉석 공개 URL을 제공하지 않습니다. 기술 지형은 [대규모 개념](../docs/concepts-at-scale.md)을 참고하세요.
 
 ## 빠른 시작
 
@@ -67,7 +67,7 @@ npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 
 시작 후 클라우드에서는 `doctor --role edge`, 비공개 연산 호스트에서는 `doctor --role worker`를 실행하고 두 역할이 실제로 같은 호스트에 있을 때만 `all`을 사용하세요. root 전용 `render redirect-helper`와 `render nat --direction apply|rollback`은 매니페스트 다이제스트 기반 소유 태그가 있는 검토 산출물만 출력하며 방화벽을 변경하지 않습니다. [운영 가이드](../docs/operations.md)를 참고하세요.
 
-`v1alpha1` 인터페이스는 미리보기 단계입니다. 버전 0.2는 원격 `apply`, `rollback`, `uninstall`을 제공하지 않습니다. 렌더러가 검토 가능한 산출물을 만들고 관리자가 의도적으로 설치합니다. 전체 [빠른 시작 가이드](../docs/quickstart.md)를 참고하세요.
+`v1alpha1` 인터페이스는 미리보기 단계입니다. 버전 0.3는 원격 `apply`, `rollback`, `uninstall`을 제공하지 않습니다. 렌더러가 검토 가능한 산출물을 만들고 관리자가 의도적으로 설치합니다. 전체 [빠른 시작 가이드](../docs/quickstart.md)를 참고하세요.
 
 ## 포함 내용
 
@@ -119,6 +119,6 @@ npm 드라이런의 파일 목록을 검사하세요. 릴리스에는 `reference
 
 ## 상태
 
-**v0.2 미리보기.** 공개 인터페이스는 변경될 수 있습니다. 이 저장소는 의도한 안전 기준을 설명하며, 특정 도메인, 클라우드 서버, 터널, npm 버전 또는 LocalLLM 배포가 실제로 작동한다고 독립 검증 전에 주장하지 않습니다. 민감하거나 안전이 중요한 시스템을 보호하는 유일한 통제로 LazyEdge를 사용하지 마세요.
+**v0.3 미리보기.** 공개 인터페이스는 변경될 수 있습니다. 이 저장소는 의도한 안전 기준을 설명하며, 특정 도메인, 클라우드 서버, 터널, npm 버전 또는 LocalLLM 배포가 실제로 작동한다고 독립 검증 전에 주장하지 않습니다. 민감하거나 안전이 중요한 시스템을 보호하는 유일한 통제로 LazyEdge를 사용하지 마세요.
 
 MIT © [Lachlan Chen](https://github.com/lachlanchen)

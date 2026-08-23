@@ -34,7 +34,7 @@ flowchart LR
 - **Transport có thể thay thế:** bắt đầu với OpenSSH; hợp đồng ứng dụng vẫn tách rời khỏi WireGuard, rathole hoặc frp trong tương lai.
 - **Edge dễ di chuyển:** render cùng dự án đã duyệt trên đám mây thứ hai, kết nối song song, kiểm tra rồi mới chuyển DNS.
 
-LazyEdge giải quyết cùng nhóm vấn đề với đường hầm ngược kiểu ngrok nhưng cố ý có phạm vi hẹp hơn: bản xem trước v0.2 chỉ công khai các tuyến HTTP API đã duyệt, không mở cổng TCP tùy ý hay URL công khai phát sinh. Xem [các khái niệm ở quy mô lớn](../docs/concepts-at-scale.md) để hiểu bản đồ công nghệ.
+LazyEdge giải quyết cùng nhóm vấn đề với đường hầm ngược kiểu ngrok nhưng cố ý có phạm vi hẹp hơn: bản xem trước v0.3 chỉ công khai các tuyến HTTP API đã duyệt, không mở cổng TCP tùy ý hay URL công khai phát sinh. Xem [các khái niệm ở quy mô lớn](../docs/concepts-at-scale.md) để hiểu bản đồ công nghệ.
 
 ## Bắt đầu nhanh
 
@@ -67,7 +67,7 @@ Hãy tách binding theo ranh giới tin cậy: chỉ đặt [ví dụ edge](../e
 
 Sau khi khởi động, chạy `doctor --role edge` trên đám mây và `doctor --role worker` trên máy tính riêng; chỉ dùng `all` khi hai vai trò thực sự cùng máy. Các lệnh root `render redirect-helper` và `render nat --direction apply|rollback` chỉ in artefact xem xét với nhãn sở hữu lấy từ digest của manifest, không thực thi thay đổi tường lửa. Xem [vận hành](../docs/operations.md).
 
-Giao diện `v1alpha1` đang ở trạng thái preview. Phiên bản 0.2 không cung cấp `apply`, `rollback` hoặc `uninstall` từ xa: bộ render tạo artefact có thể xem xét và quản trị viên chủ động cài đặt chúng. Xem [hướng dẫn bắt đầu đầy đủ](../docs/quickstart.md).
+Giao diện `v1alpha1` đang ở trạng thái preview. Phiên bản 0.3 không cung cấp `apply`, `rollback` hoặc `uninstall` từ xa: bộ render tạo artefact có thể xem xét và quản trị viên chủ động cài đặt chúng. Xem [hướng dẫn bắt đầu đầy đủ](../docs/quickstart.md).
 
 ## Nội dung hiện có
 
@@ -119,6 +119,6 @@ Nếu sử dụng LazyEdge trong nghiên cứu, hãy trích dẫn kho mã. GitHu
 
 ## Trạng thái
 
-**Bản xem trước v0.2.** Giao diện công khai có thể thay đổi. Kho mã này mô tả nền tảng an toàn dự kiến; nó không tuyên bố bất kỳ domain, máy chủ đám mây, đường hầm, phiên bản npm hay triển khai LocalLLM cụ thể nào đang hoạt động trước khi môi trường đó được xác minh độc lập. Không dùng LazyEdge làm lớp bảo vệ duy nhất cho hệ thống nhạy cảm hoặc quan trọng về an toàn.
+**Bản xem trước v0.3.** Giao diện công khai có thể thay đổi. Kho mã này mô tả nền tảng an toàn dự kiến; nó không tuyên bố bất kỳ domain, máy chủ đám mây, đường hầm, phiên bản npm hay triển khai LocalLLM cụ thể nào đang hoạt động trước khi môi trường đó được xác minh độc lập. Không dùng LazyEdge làm lớp bảo vệ duy nhất cho hệ thống nhạy cảm hoặc quan trọng về an toàn.
 
 MIT © [Lachlan Chen](https://github.com/lachlanchen)

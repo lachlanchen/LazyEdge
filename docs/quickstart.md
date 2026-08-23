@@ -22,7 +22,7 @@ cd my-edge
 npx @lazyingart/lazyedge init --output lazyedge.yaml
 ```
 
-`init` creates one secret-free `lazyedge.yaml`. Open the manifest and replace example hosts and ports. The v0.2 preview requires exact IPv4 loopback listeners such as `127.0.0.1:18008`; never use `0.0.0.0`, `::1`, a LAN address, or a raw public target.
+`init` creates one secret-free `lazyedge.yaml`. Open the manifest and replace example hosts and ports. The v0.3 preview requires exact IPv4 loopback listeners such as `127.0.0.1:18008`; never use `0.0.0.0`, `::1`, a LAN address, or a raw public target.
 
 For a LocalLLM/OpenAI-compatible service, use `profile: localllm-openai`. That profile admits only a chosen subset of this reviewed four-route set:
 
@@ -138,28 +138,32 @@ The public-key file must contain the dedicated worker tunnel's Ed25519 public ke
 
 Without `--component`, `render systemd` emits a labeled multi-section review bundle. Use `--component edge`, `worker`, `tunnel`, `caddy`, `redirect`, or `certbot` to render one section at a time after the complete bundle has been reviewed. The root-only `redirect` component is a manual persistence artifact for an already reviewed port cutover; rendering it neither changes nor authorizes firewall state.
 
-Generated units do not install the CLI. Install the reviewed package first and render each unit with the executable, manifest, bindings, and Node.js paths that will actually exist on that host. A user-prefix/NVM worker can use this pattern:
+Generated units do not install the CLI. Install the reviewed package first and render each unit with the executable, manifest, bindings, and Node.js paths that will actually exist on that host. Resolve an exact version, pack it once, verify the tarball, and install those same bytes into an immutable checksum-named prefix on each role. Do not use `latest` or a moving global launcher for a service unit. A user-prefix/NVM worker can use this pattern after replacing the expected checksum with the reviewed value:
 
 ```bash
-LAZYEDGE_VERSION=$(npm view @lazyingart/lazyedge version)
-case "$LAZYEDGE_VERSION" in
-  ''|*[!0-9.]*) echo "Unexpected LazyEdge version" >&2; exit 1 ;;
-esac
-npm install --global --prefix "$HOME/.local" \
-  "@lazyingart/lazyedge@$LAZYEDGE_VERSION"
+LAZYEDGE_VERSION=0.3.0
+LAZYEDGE_STAGE=$(mktemp -d)
+npm pack "@lazyingart/lazyedge@$LAZYEDGE_VERSION" \
+  --pack-destination "$LAZYEDGE_STAGE"
+LAZYEDGE_PACKAGE="$LAZYEDGE_STAGE/lazyingart-lazyedge-$LAZYEDGE_VERSION.tgz"
+LAZYEDGE_SHA256=$(sha256sum "$LAZYEDGE_PACKAGE" | awk '{print $1}')
+test "$LAZYEDGE_SHA256" = "REPLACE_WITH_REVIEWED_SHA256"
+LAZYEDGE_RELEASE="$HOME/.local/lib/lazyedge/releases/$LAZYEDGE_VERSION-$LAZYEDGE_SHA256"
+npm install --global --ignore-scripts --prefix "$LAZYEDGE_RELEASE" \
+  "$LAZYEDGE_PACKAGE"
 LAZYEDGE_NODE_BIN=$(dirname "$(command -v node)")
 
-"$HOME/.local/bin/lazyedge" render systemd \
+"$LAZYEDGE_RELEASE/bin/lazyedge" render systemd \
   --config "$HOME/.config/lazyedge/lazyedge.yaml" \
   --component worker \
-  --executable "$HOME/.local/bin/lazyedge" \
+  --executable "$LAZYEDGE_RELEASE/bin/lazyedge" \
   --manifest-path "$HOME/.config/lazyedge/lazyedge.yaml" \
   --bindings-path "$HOME/.config/lazyedge/bindings.worker.yaml" \
   --environment-file "$HOME/.config/lazyedge/worker.env" \
-  --runtime-path "$LAZYEDGE_NODE_BIN:$HOME/.local/bin:/usr/local/bin:/usr/bin" \
+  --runtime-path "$LAZYEDGE_NODE_BIN:$LAZYEDGE_RELEASE/bin:/usr/local/bin:/usr/bin" \
   --after-unit localllm-api.service
 
-"$HOME/.local/bin/lazyedge" render systemd \
+"$LAZYEDGE_RELEASE/bin/lazyedge" render systemd \
   --config "$HOME/.config/lazyedge/lazyedge.yaml" \
   --component tunnel \
   --ssh-config-path "$HOME/.config/lazyedge/ssh/config" \
@@ -167,11 +171,12 @@ LAZYEDGE_NODE_BIN=$(dirname "$(command -v node)")
   --worker-unit lazyedge-worker.service
 ```
 
-This resolves `latest` once and installs that exact version. Record the version
-and package integrity in the deployment revision; upgrades must resolve and
-review a new immutable version rather than silently tracking a moving tag.
+Keep the tarball until both roles have been installed and their complete file
+lists verified. Record the version, SHA-256, registry integrity and immutable
+paths in the deployment revision; upgrades install a new release directory
+rather than mutating this one.
 
-The worker's `--runtime-path` must contain the exact Node.js 20+ binary directory used by the CLI. `--after-unit` expresses a reviewed local-upstream dependency; omit it when no matching user unit exists. Edge installations normally pin the verified CLI at `/usr/local/bin/lazyedge`, but may use the same `--executable`, `--manifest-path`, `--bindings-path`, `--environment-file`, and `--runtime-path` options with `--component edge`. These flags write only unit text; they do not install packages or units.
+The worker's `--runtime-path` must contain the exact Node.js 20+ binary directory used by the CLI. `--after-unit` expresses a reviewed local-upstream dependency; omit it when no matching user unit exists. Edge installations use the same `--executable`, `--manifest-path`, `--bindings-path`, `--environment-file`, and `--runtime-path` options with `--component edge`, and should also point directly into a checksum-named release. These flags write only unit text; they do not install packages or units.
 
 Confirm:
 
@@ -217,7 +222,7 @@ Use `--role all` only for a deliberately co-located rehearsal where both sets of
 
 ## 5. Deploy deliberately
 
-Version `0.2` does not implement remote `apply`, `rollback`, `uninstall`, or `status`. The render commands write artifacts to standard output for review. Save them to a protected staging directory, validate them with their native tools, and install them manually following [operations](operations.md). The `accounts` output is a bootstrap script: inspect every line and run it only through an authorized administrator session.
+Version `0.3` does not implement remote `apply`, `rollback`, `uninstall`, or `status`. The render commands write artifacts to standard output for review. Save them to a protected staging directory, validate them with their native tools, and install them manually following [operations](operations.md). The `accounts` output is a bootstrap script: inspect every line and run it only through an authorized administrator session.
 
 Never pipe a downloaded script to a shell, never let LazyEdge replace an unrelated site, and never expose a reverse listener on a wildcard address. Keep the previous native configuration as the rollback target.
 

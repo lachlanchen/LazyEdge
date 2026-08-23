@@ -34,7 +34,7 @@ flowchart LR
 - **Transport remplaçable :** OpenSSH en premier ; le contrat applicatif reste découplé d'un futur transport WireGuard, rathole ou frp.
 - **Passerelle migrable :** générez le même projet relu sur un second cloud, connectez-le en parallèle, testez, puis déplacez le DNS.
 
-LazyEdge répond au même type de besoin qu'un tunnel inverse façon ngrok, mais reste volontairement plus étroit : l’aperçu v0.2 publie des routes d'API HTTP relues, pas des ports TCP arbitraires ni des URL publiques improvisées. Consultez les [concepts à grande échelle](../docs/concepts-at-scale.md) pour situer les technologies.
+LazyEdge répond au même type de besoin qu'un tunnel inverse façon ngrok, mais reste volontairement plus étroit : l’aperçu v0.3 publie des routes d'API HTTP relues, pas des ports TCP arbitraires ni des URL publiques improvisées. Consultez les [concepts à grande échelle](../docs/concepts-at-scale.md) pour situer les technologies.
 
 ## Démarrage rapide
 
@@ -67,7 +67,7 @@ Séparez les liaisons par frontière de confiance : placez l'[exemple edge](../e
 
 Après le démarrage, exécutez `doctor --role edge` dans le cloud et `doctor --role worker` sur le calcul privé ; utilisez `all` uniquement si les deux rôles sont réellement colocalisés. Les commandes root `render redirect-helper` et `render nat --direction apply|rollback` impriment des artefacts de vérification portant une marque de propriété dérivée du condensat du manifeste ; elles ne modifient jamais le pare-feu. Consultez [l'exploitation](../docs/operations.md).
 
-L'interface `v1alpha1` est expérimentale. La version 0.2 ne fournit pas de `apply`, `rollback` ou `uninstall` distant : les générateurs écrivent des artefacts vérifiables, qu'un administrateur installe délibérément. Consultez le [guide complet](../docs/quickstart.md).
+L'interface `v1alpha1` est expérimentale. La version 0.3 ne fournit pas de `apply`, `rollback` ou `uninstall` distant : les générateurs écrivent des artefacts vérifiables, qu'un administrateur installe délibérément. Consultez le [guide complet](../docs/quickstart.md).
 
 ## Contenu
 
@@ -119,6 +119,6 @@ Si vous utilisez LazyEdge dans une recherche, citez le dépôt. GitHub lit [CITA
 
 ## État
 
-**Aperçu v0.2.** L'interface publique peut évoluer. Ce dépôt décrit la base de sécurité visée ; il ne prétend pas qu'un domaine, serveur cloud, tunnel, paquet npm ou déploiement LocalLLM particulier est actif avant vérification indépendante de cet environnement. N'utilisez pas LazyEdge comme unique protection d'un système sensible ou critique pour la sécurité.
+**Aperçu v0.3.** L'interface publique peut évoluer. Ce dépôt décrit la base de sécurité visée ; il ne prétend pas qu'un domaine, serveur cloud, tunnel, paquet npm ou déploiement LocalLLM particulier est actif avant vérification indépendante de cet environnement. N'utilisez pas LazyEdge comme unique protection d'un système sensible ou critique pour la sécurité.
 
 MIT © [Lachlan Chen](https://github.com/lachlanchen)

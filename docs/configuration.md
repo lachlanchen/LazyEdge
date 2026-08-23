@@ -53,7 +53,7 @@ See [`examples/local-llm/lazyedge.yaml`](../examples/local-llm/lazyedge.yaml) an
 | `kind` | yes | exactly `EdgeProject` |
 | `metadata.name` | yes | lowercase project identity used in generated names |
 | `spec.edge` | yes | public-gateway listeners and coexistence information |
-| `spec.transport` | yes | outbound-created transport; v0.2 preview supports `openssh-reverse` |
+| `spec.transport` | yes | outbound-created transport; v0.3 preview supports `openssh-reverse` |
 | `spec.services` | yes | one or more explicit HTTP service contracts |
 
 Unknown keys are rejected rather than silently ignored.
@@ -80,7 +80,7 @@ Unknown keys are rejected rather than silently ignored.
 
 | Field | Meaning |
 | --- | --- |
-| `provider` | exactly `openssh-reverse` in the v0.2 preview |
+| `provider` | exactly `openssh-reverse` in the v0.3 preview |
 | `sshHost` | reviewed, directly resolvable edge DNS name or IP address written as `HostName` in the generated standalone SSH config |
 | `sshUser` | dedicated unprivileged tunnel account |
 | `sshPort` | optional SSH port; default is implementation-defined/22 |
@@ -136,7 +136,7 @@ bindings:
     upstreamAuthorizationFile: ~/.config/lazyedge/secrets/local-llm-upstream-key
 ```
 
-The two `relaySecretFile` paths refer to protected files containing the same relay capability on different hosts. The edge runtime dereferences only the relay secret and `clientTokenStore`; the worker runtime dereferences only the relay secret and `upstreamAuthorizationFile`. Do not copy the client token store to the worker or the upstream key to the edge. Bindings and every referenced secret must be regular, owner-readable, non-symlink files with restrictive permissions. In the v0.2 preview, every worker binding requires `upstreamAuthorizationFile`; it contains the bare token that the worker injects as `Authorization: Bearer …`. Configure the private service to require that token.
+The two `relaySecretFile` paths refer to protected files containing the same relay capability on different hosts. The edge runtime dereferences only the relay secret and `clientTokenStore`; the worker runtime dereferences only the relay secret and `upstreamAuthorizationFile`. Do not copy the client token store to the worker or the upstream key to the edge. Bindings and every referenced secret must be regular, owner-readable, non-symlink files with restrictive permissions. In the v0.3 preview, every worker binding requires `upstreamAuthorizationFile`; it contains the bare token that the worker injects as `Authorization: Bearer …`. Configure the private service to require that token.
 
 To reuse an existing LocalLLM key without printing or manually copying it, `lazyedge secret import-env --env-file FILE --name LOCALLLM_API_KEY --out FILE` can extract exactly one 32–4096-character whitespace-free capability variable from a private regular non-symlink `.env` into a new mode-`0600` file. The source remains unchanged, and the command refuses to overwrite the destination. This is a migration convenience, not permission to put `.env` in Git or `references/private/`.
 

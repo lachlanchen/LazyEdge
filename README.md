@@ -35,7 +35,7 @@ flowchart LR
 - **Private service listeners:** an application-neutral authenticated loopback seam lets edge-local callers reach explicitly selected services without DNS, Caddy, TLS, or NAT exposure.
 - **Migratable edge:** render the same reviewed project on a second cloud, connect it in parallel, test, then move DNS.
 
-LazyEdge occupies the same problem space as an ngrok-style reverse tunnel, but it is intentionally narrower: the v0.2 preview exposes reviewed HTTP API routes, not arbitrary TCP ports or ad-hoc public URLs. See [concepts at scale](docs/concepts-at-scale.md) for the technology map.
+LazyEdge occupies the same problem space as an ngrok-style reverse tunnel, but it is intentionally narrower: the v0.3 preview exposes reviewed HTTP API routes, not arbitrary TCP ports or ad-hoc public URLs. See [concepts at scale](docs/concepts-at-scale.md) for the technology map.
 
 ## Quickstart
 
@@ -68,7 +68,7 @@ Keep runtime bindings split by trust boundary: copy the [edge example](examples/
 
 After startup, run `doctor --role edge` on the cloud and `doctor --role worker` on private compute; use `all` only when both roles are genuinely co-located. Root-only `render redirect-helper` and `render nat --direction apply|rollback` commands print review artifacts with manifest-digest ownership tags—they never execute a firewall change. See [operations](docs/operations.md).
 
-The `v1alpha1` interface is preview. Version 0.2 does not ship remote `apply`, `rollback`, or `uninstall`: renderers write reviewable artifacts, and an administrator installs them deliberately. See the complete [quickstart](docs/quickstart.md).
+The `v1alpha1` interface is preview. Version 0.3 does not ship remote `apply`, `rollback`, or `uninstall`: renderers write reviewable artifacts, and an administrator installs them deliberately. See the complete [quickstart](docs/quickstart.md).
 
 ## What is included
 
@@ -88,7 +88,8 @@ The `v1alpha1` interface is preview. Version 0.2 does not ship remote `apply`, `
 - [Configuration reference](docs/configuration.md)
 - [Security and threat model](docs/security.md)
 - [Operations and rollback](docs/operations.md)
-- [Upgrade v0.2 to the proposed transport-only v0.3](docs/upgrading-v0.2-to-v0.3.md)
+- [Upgrade v0.2 to transport-only v0.3](docs/upgrading-v0.2-to-v0.3.md)
+- [v0.3.0 release notes](docs/releases/v0.3.0.md)
 - [Alibaba → Huawei or dual-edge migration](docs/migration.md)
 - [OpenAI-compatible client integration](docs/integrations/openai-compatible-clients.md)
 - [Application-neutral private service listeners](docs/private-service-listeners.md)
@@ -122,6 +123,6 @@ If you use LazyEdge in research, cite the repository. GitHub reads [CITATION.cff
 
 ## Status
 
-**v0.2 preview.** The public interface may change. This repository describes the intended safe baseline; it does not claim that any particular domain, cloud server, tunnel, npm version, or LocalLLM deployment is live until that environment is independently verified. Do not use LazyEdge as the only control protecting sensitive or safety-critical systems.
+**v0.3 preview.** The public interface may change. This repository describes the intended safe baseline; it does not claim that any particular domain, cloud server, tunnel, npm version, or LocalLLM deployment is live until that environment is independently verified. Do not use LazyEdge as the only control protecting sensitive or safety-critical systems.
 
 MIT © [Lachlan Chen](https://github.com/lachlanchen)

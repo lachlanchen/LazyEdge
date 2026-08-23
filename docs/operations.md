@@ -152,10 +152,10 @@ Health checks should be cheap and disclose no model list, filesystem path, build
 
 ## Updating
 
-For the breaking separation of v0.2 private chat from the proposed
-transport-only v0.3, follow the dedicated
-[upgrade guide](upgrading-v0.2-to-v0.3.md). That guide describes an unreleased
-candidate, not an available release or deployment.
+For the breaking separation of v0.2 private chat from transport-only v0.3,
+follow the dedicated [upgrade guide](upgrading-v0.2-to-v0.3.md). The guide and
+source metadata do not prove that an exact package was published or deployed;
+verify the registry artifact and each running process independently.
 
 1. Read release notes and diff the manifest/schema changes.
 2. Back up only the current config, generated units, token metadata, and last-known-good digest—not live tokens in a shared archive.

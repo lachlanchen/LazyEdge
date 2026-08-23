@@ -1,6 +1,6 @@
 {
   "name": "@lazyingart/lazyedge",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A lightweight, default-deny reverse edge for safely connecting private compute to public domains.",
   "type": "module",
   "license": "MIT",

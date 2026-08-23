@@ -34,7 +34,7 @@ flowchart LR
 - **Austauschbarer Transport:** Zunächst OpenSSH; der Anwendungsvertrag bleibt von künftigem WireGuard-, rathole- oder frp-Transport entkoppelt.
 - **Migrierbarer Edge:** Erzeugen Sie dasselbe geprüfte Projekt in einer zweiten Cloud, verbinden und testen Sie es parallel und verschieben Sie danach DNS.
 
-LazyEdge löst einen ähnlichen Bedarf wie ein ngrok-artiger Reverse-Tunnel, ist aber absichtlich enger gefasst: Die v0.2-Vorschau veröffentlicht geprüfte HTTP-API-Routen, keine beliebigen TCP-Ports oder spontanen öffentlichen URLs. Die technische Einordnung finden Sie unter [Konzepte im großen Maßstab](../docs/concepts-at-scale.md).
+LazyEdge löst einen ähnlichen Bedarf wie ein ngrok-artiger Reverse-Tunnel, ist aber absichtlich enger gefasst: Die v0.3-Vorschau veröffentlicht geprüfte HTTP-API-Routen, keine beliebigen TCP-Ports oder spontanen öffentlichen URLs. Die technische Einordnung finden Sie unter [Konzepte im großen Maßstab](../docs/concepts-at-scale.md).
 
 ## Schnellstart
 
@@ -67,7 +67,7 @@ Trennen Sie Bindings nach Vertrauensgrenze: Legen Sie das [Edge-Beispiel](../exa
 
 Führen Sie nach dem Start `doctor --role edge` in der Cloud und `doctor --role worker` auf dem privaten Rechner aus; verwenden Sie `all` nur bei tatsächlich gemeinsamem Host. Die root-spezifischen Befehle `render redirect-helper` und `render nat --direction apply|rollback` geben lediglich Prüfarbeitsstände mit einer aus dem Manifest-Digest abgeleiteten Eigentumsmarke aus und ändern nie die Firewall. Siehe [Betrieb](../docs/operations.md).
 
-Die Schnittstelle `v1alpha1` ist eine Vorschau. Version 0.2 liefert kein entferntes `apply`, `rollback` oder `uninstall`: Renderer schreiben prüfbare Artefakte, die ein Administrator bewusst installiert. Siehe den [vollständigen Schnellstart](../docs/quickstart.md).
+Die Schnittstelle `v1alpha1` ist eine Vorschau. Version 0.3 liefert kein entferntes `apply`, `rollback` oder `uninstall`: Renderer schreiben prüfbare Artefakte, die ein Administrator bewusst installiert. Siehe den [vollständigen Schnellstart](../docs/quickstart.md).
 
 ## Inhalt
 
@@ -119,6 +119,6 @@ Wenn Sie LazyEdge in der Forschung verwenden, zitieren Sie das Repository. GitHu
 
 ## Status
 
-**v0.2-Vorschau.** Die öffentliche Schnittstelle kann sich ändern. Dieses Repository beschreibt die beabsichtigte sichere Grundlage; es behauptet nicht, dass eine bestimmte Domain, ein Cloud-Server, Tunnel, npm-Paket oder eine LocalLLM-Bereitstellung aktiv ist, bevor diese Umgebung unabhängig geprüft wurde. Verwenden Sie LazyEdge nicht als alleinige Schutzmaßnahme für sensible oder sicherheitskritische Systeme.
+**v0.3-Vorschau.** Die öffentliche Schnittstelle kann sich ändern. Dieses Repository beschreibt die beabsichtigte sichere Grundlage; es behauptet nicht, dass eine bestimmte Domain, ein Cloud-Server, Tunnel, npm-Paket oder eine LocalLLM-Bereitstellung aktiv ist, bevor diese Umgebung unabhängig geprüft wurde. Verwenden Sie LazyEdge nicht als alleinige Schutzmaßnahme für sensible oder sicherheitskritische Systeme.
 
 MIT © [Lachlan Chen](https://github.com/lachlanchen)
