@@ -33,7 +33,6 @@ flowchart LR
 - **Tách thông tin xác thực:** thông tin client, relay, upstream và SSH khác nhau và nằm ngoài manifest.
 - **Transport có thể thay thế:** bắt đầu với OpenSSH; hợp đồng ứng dụng vẫn tách rời khỏi WireGuard, rathole hoặc frp trong tương lai.
 - **Edge dễ di chuyển:** render cùng dự án đã duyệt trên đám mây thứ hai, kết nối song song, kiểm tra rồi mới chuyển DNS.
-- **Chat riêng tư tùy chọn (bản xem trước v0.2):** một BFF loopback riêng cung cấp PWA có thể cài đặt với giao diện sáng mặc định/tối, luồng văn bản tăng dần, tùy chọn ghi nhớ đăng nhập và hỗ trợ trình quản lý mật khẩu của trình duyệt, cùng Markdown an toàn và KaTeX ngoại tuyến cùng origin; token API và đường dẫn mô hình thô vẫn ở phía máy chủ.
 
 LazyEdge giải quyết cùng nhóm vấn đề với đường hầm ngược kiểu ngrok nhưng cố ý có phạm vi hẹp hơn: bản xem trước v0.2 chỉ công khai các tuyến HTTP API đã duyệt, không mở cổng TCP tùy ý hay URL công khai phát sinh. Xem [các khái niệm ở quy mô lớn](../docs/concepts-at-scale.md) để hiểu bản đồ công nghệ.
 
@@ -62,7 +61,7 @@ npx @lazyingart/lazyedge render accounts --config ./lazyedge.yaml \
 npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 ```
 
-Lệnh Caddy ở trên dùng Automatic HTTPS. Chỉ thêm `--manual-certificates` khi đã có bố cục Certbot tại `/etc/letsencrypt/live/<host>/`. Bộ render tài khoản yêu cầu khóa công khai Ed25519 chuyên dụng; các đường dẫn OpenSSH chỉ trỏ tới tệp riêng tư trên worker và không sao chép nội dung. Lệnh systemd tạo gói xem xét có nhãn hoặc nhận `--component edge|worker|tunnel|caddy|redirect|certbot|chat` để xuất một phần.
+Lệnh Caddy ở trên dùng Automatic HTTPS. Chỉ thêm `--manual-certificates` khi đã có bố cục Certbot tại `/etc/letsencrypt/live/<host>/`. Bộ render tài khoản yêu cầu khóa công khai Ed25519 chuyên dụng; các đường dẫn OpenSSH chỉ trỏ tới tệp riêng tư trên worker và không sao chép nội dung. Lệnh systemd tạo gói xem xét có nhãn hoặc nhận `--component edge|worker|tunnel|caddy|redirect|certbot` để xuất một phần.
 
 Hãy tách binding theo ranh giới tin cậy: chỉ đặt [ví dụ edge](../examples/local-llm/bindings.edge.example.yaml) trên cổng công khai và [ví dụ worker](../examples/local-llm/bindings.worker.example.yaml) trên máy tính riêng. Mỗi tiến trình chỉ đọc thông tin xác thực cho vai trò của mình; không vai trò nào cần kho thông tin xác thực của vai trò kia.
 
@@ -89,7 +88,7 @@ Giao diện `v1alpha1` đang ở trạng thái preview. Phiên bản 0.2 không 
 - [Bảo mật và mô hình đe dọa](../docs/security.md)
 - [Vận hành và rollback](../docs/operations.md)
 - [Di chuyển Alibaba → Huawei hoặc dual-edge](../docs/migration.md)
-- [Tích hợp LocalLLM + AgInTi](../docs/integrations/local-llm-aginti.md)
+- [Client tương thích OpenAI](../docs/integrations/openai-compatible-clients.md)
 - [Khắc phục sự cố](../docs/troubleshooting.md)
 - [Quan hệ với hệ thống nhiều máy chủ quy mô lớn](../docs/concepts-at-scale.md)
 

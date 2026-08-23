@@ -246,11 +246,11 @@ export function normalizeLoopbackListener(value, label = "listener") {
   let host;
   let portText;
   if (value.startsWith("[")) {
-    const match = /^\[([^\]]+)\]:(\d{1,5})$/u.exec(value);
+    const match = /^\[([^\]]+)\]:(0|[1-9]\d{0,4})$/u.exec(value);
     if (!match) throw new SecurityError(`${label} must be a loopback host:port`);
     [, host, portText] = match;
   } else {
-    const match = /^([^:]+):(\d{1,5})$/u.exec(value);
+    const match = /^([^:]+):(0|[1-9]\d{0,4})$/u.exec(value);
     if (!match) throw new SecurityError(`${label} must be a loopback host:port`);
     [, host, portText] = match;
   }

@@ -26,6 +26,7 @@ export function compileHttpPolicy(manifestInput) {
   const claims = new Map();
   const hosts = new Set();
   for (const service of manifest.spec.services) {
+    if ((service.exposure ?? "public") !== "public") continue;
     for (const host of service.domains) {
       hosts.add(host);
       for (const route of service.public.routes) {

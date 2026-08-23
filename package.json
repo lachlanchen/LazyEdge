@@ -32,7 +32,6 @@
     "i18n/",
     "scripts/",
     "test/",
-    ".env.example",
     "CITATION.cff",
     "CONTRIBUTING.md",
     "LICENSE",
@@ -59,7 +58,6 @@
     "devops"
   ],
   "dependencies": {
-    "katex": "0.16.47",
     "yaml": "2.9.0"
   }
 }

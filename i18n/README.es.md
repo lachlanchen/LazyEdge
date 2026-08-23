@@ -33,7 +33,6 @@ flowchart LR
 - **Credenciales separadas:** cliente, relé, servicio ascendente y SSH usan credenciales distintas fuera del manifiesto.
 - **Transporte sustituible:** OpenSSH primero; el contrato de aplicación permanece desacoplado de futuros transportes WireGuard, rathole o frp.
 - **Borde migrable:** genera el mismo proyecto revisado en una segunda nube, conéctalo en paralelo, pruébalo y después mueve DNS.
-- **Chat privado opcional (vista previa v0.2):** un BFF dedicado en loopback ofrece una PWA instalable clara por defecto/oscura, streaming incremental de texto, inicio recordado opcional y compatibilidad con el gestor de contraseñas del navegador, además de Markdown seguro y KaTeX sin conexión del mismo origen; los tokens de API y rutas de modelo sin procesar permanecen en el servidor.
 
 LazyEdge ocupa un espacio parecido al de un túnel inverso estilo ngrok, pero es deliberadamente más estrecho: la vista previa v0.2 publica rutas HTTP API revisadas, no puertos TCP arbitrarios ni URL públicas improvisadas. Consulta [conceptos a escala](../docs/concepts-at-scale.md) para ver el mapa tecnológico.
 
@@ -62,7 +61,7 @@ npx @lazyingart/lazyedge render accounts --config ./lazyedge.yaml \
 npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 ```
 
-El comando Caddy anterior usa HTTPS automático. Añade `--manual-certificates` solo para un esquema Certbot existente en `/etc/letsencrypt/live/<host>/`. El generador de cuentas requiere una clave pública Ed25519 dedicada; las rutas OpenSSH apuntan a archivos privados del trabajador sin copiar su contenido. El comando systemd produce un paquete de revisión etiquetado o acepta `--component edge|worker|tunnel|caddy|redirect|certbot|chat` para una sola sección.
+El comando Caddy anterior usa HTTPS automático. Añade `--manual-certificates` solo para un esquema Certbot existente en `/etc/letsencrypt/live/<host>/`. El generador de cuentas requiere una clave pública Ed25519 dedicada; las rutas OpenSSH apuntan a archivos privados del trabajador sin copiar su contenido. El comando systemd produce un paquete de revisión etiquetado o acepta `--component edge|worker|tunnel|caddy|redirect|certbot` para una sola sección.
 
 Separa los enlaces por límite de confianza: coloca el [ejemplo del borde](../examples/local-llm/bindings.edge.example.yaml) solo en la puerta de enlace pública y el [ejemplo del trabajador](../examples/local-llm/bindings.worker.example.yaml) solo en el cómputo privado. Cada proceso lee únicamente las credenciales de su función; ninguno necesita el almacén de credenciales del otro.
 
@@ -89,7 +88,7 @@ La interfaz `v1alpha1` está en vista previa. La versión 0.2 no incluye `apply`
 - [Seguridad y modelo de amenazas](../docs/security.md)
 - [Operación y reversión](../docs/operations.md)
 - [Migración Alibaba → Huawei o doble borde](../docs/migration.md)
-- [Integración de LocalLLM + AgInTi](../docs/integrations/local-llm-aginti.md)
+- [Clientes compatibles con OpenAI](../docs/integrations/openai-compatible-clients.md)
 - [Solución de problemas](../docs/troubleshooting.md)
 - [Relación con sistemas grandes de varios servidores](../docs/concepts-at-scale.md)
 

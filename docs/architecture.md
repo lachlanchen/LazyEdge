@@ -37,7 +37,6 @@ Caddy itself supports streaming responses and WebSocket upgrades, but the v0.2 p
 | SSH client | private worker | outbound only | maintains the remote forward |
 | worker guard | private worker | no; loopback only | relay auth, duplicate policy, upstream auth |
 | private service | private worker | no; loopback only | LocalLLM, Whisper, SoVITS, or another approved API |
-| private chat BFF | cloud edge | no; `127.0.0.1:17610` | browser login/session, remembered-session digest state, stable model aliases, strict text SSE |
 
 The default transport is OpenSSH because it is widely available, inspectable, and sufficient for a small number of workers. [WireGuard](https://www.wireguard.com/) is a good future transport when many private services should share one routed overlay. [rathole](https://github.com/rathole-org/rathole) and [frp](https://gofrp.org/en/docs/overview/) are purpose-built reverse-tunnel alternatives. LazyEdge treats transport as replaceable; the route and authentication contract stays above it.
 
@@ -55,10 +54,27 @@ Runtime bindings preserve the same split. The edge loads only its relay secret a
 
 This is not a bypass and must never bind to a public or LAN address. When multiple services exist, the supervising unit selects one explicit service ID for each compatibility listener.
 
-The optional [private chat](private-chat.md) uses this compatibility listener as its only upstream. It runs under a separate account, holds a narrowly scoped external token, password verifier, and independent remembered-session secret through systemd credentials, and never calls the public gateway by spoofing a Host header. Caddy routes only the exact browser document, asset, authentication, model, and HTTP/SSE completion contract to the BFF; the ordinary `/v1` Bearer path remains on the edge guard. Its installable PWA caches only the reviewed same-origin app shell, never authenticated chat requests, credentials, or model responses.
+## Application-neutral private service listeners
+
+`spec.edge.privateListeners` is the multi-service cloud-local seam. Each exact
+loopback listener selects one private manifest service before startup and
+accepts only that service's external token set, method/path claims and resource limits. It
+then injects only the selected relay capability and follows the same reverse
+listener and worker-guard chain. Host headers, queries and CLI options cannot
+select or redirect a private listener.
+
+A service with `exposure: private` has `domains: []`, must own one private
+listener and is omitted from Caddy, certificate and NAT ingress. A public
+service cannot own a private listener because the two ingresses require
+separate credential audiences. Public remains the default exposure and keeps
+the existing non-empty domain contract. A
+private-only project supervises the edge listener, tunnel and worker without
+generating public-ingress lifecycle artifacts. See [private service
+listeners](private-service-listeners.md) for the exact manifest and acceptance
+boundary.
 
 ## Default-deny contract
 
-Each service names domains, one edge-side loopback upstream, one worker listener, one loopback target, a token set, and exact public routes. Wildcard target hosts, arbitrary TCP destinations, raw management ports, CDP, VNC, and noVNC are outside the design.
+Each service names an exposure, zero or more exposure-valid domains, one edge-side loopback upstream, one worker listener, one loopback target, a token set, and exact HTTP routes. Wildcard target hosts, arbitrary TCP destinations, raw management ports, CDP, VNC, and noVNC are outside the design.
 
 Read [configuration](configuration.md) for the manifest contract and [security](security.md) for assumptions and limits.

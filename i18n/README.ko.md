@@ -33,7 +33,6 @@ flowchart LR
 - **자격 증명 분리:** 클라이언트, 릴레이, 업스트림, SSH 자격 증명은 서로 다르며 매니페스트 밖에 둡니다.
 - **교체 가능한 전송 계층:** 먼저 OpenSSH를 사용하고 애플리케이션 계약은 향후 WireGuard, rathole, frp 전송과 분리합니다.
 - **이전 가능한 엣지:** 동일하게 검토된 프로젝트를 두 번째 클라우드에 렌더링하고 병렬 연결로 시험한 뒤 DNS를 옮깁니다.
-- **선택형 비공개 채팅(v0.2 미리보기):** 전용 loopback BFF가 기본 밝은/어두운 설치형 PWA, 점진적 텍스트 스트리밍, 선택형 로그인 유지와 브라우저 비밀번호 관리자 지원, 안전한 Markdown 및 동일 출처 오프라인 KaTeX를 제공하며 API 토큰과 원시 모델 경로는 서버에 남겨 둡니다.
 
 LazyEdge는 ngrok형 역방향 터널과 같은 문제 영역을 다루지만 의도적으로 범위가 더 좁습니다. v0.2 미리보기는 검토된 HTTP API 경로만 공개하며 임의의 TCP 포트나 즉석 공개 URL을 제공하지 않습니다. 기술 지형은 [대규모 개념](../docs/concepts-at-scale.md)을 참고하세요.
 
@@ -62,7 +61,7 @@ npx @lazyingart/lazyedge render accounts --config ./lazyedge.yaml \
 npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 ```
 
-위 Caddy 명령은 Automatic HTTPS를 사용합니다. `/etc/letsencrypt/live/<host>/`에 기존 Certbot 구성이 있을 때만 `--manual-certificates`를 추가하세요. 계정 렌더러에는 전용 Ed25519 공개 키가 필요하며, OpenSSH 경로는 워커의 비공개 파일을 가리킬 뿐 내용을 복사하지 않습니다. systemd 명령은 레이블이 붙은 검토 번들을 출력하고 `--component edge|worker|tunnel|caddy|redirect|certbot|chat`으로 한 섹션만 선택할 수 있습니다.
+위 Caddy 명령은 Automatic HTTPS를 사용합니다. `/etc/letsencrypt/live/<host>/`에 기존 Certbot 구성이 있을 때만 `--manual-certificates`를 추가하세요. 계정 렌더러에는 전용 Ed25519 공개 키가 필요하며, OpenSSH 경로는 워커의 비공개 파일을 가리킬 뿐 내용을 복사하지 않습니다. systemd 명령은 레이블이 붙은 검토 번들을 출력하고 `--component edge|worker|tunnel|caddy|redirect|certbot`으로 한 섹션만 선택할 수 있습니다.
 
 바인딩을 신뢰 경계별로 분리하세요. [edge 예제](../examples/local-llm/bindings.edge.example.yaml)는 공개 게이트웨이에만, [worker 예제](../examples/local-llm/bindings.worker.example.yaml)는 비공개 연산 호스트에만 둡니다. 각 런타임은 자기 역할의 자격 증명만 읽으며 상대 역할의 자격 증명 저장소는 필요하지 않습니다.
 
@@ -89,7 +88,7 @@ npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 - [보안 및 위협 모델](../docs/security.md)
 - [운영 및 롤백](../docs/operations.md)
 - [Alibaba → Huawei 또는 이중 엣지 이전](../docs/migration.md)
-- [LocalLLM + AgInTi 통합](../docs/integrations/local-llm-aginti.md)
+- [OpenAI 호환 클라이언트](../docs/integrations/openai-compatible-clients.md)
 - [문제 해결](../docs/troubleshooting.md)
 - [대규모 다중 서버 시스템과의 관계](../docs/concepts-at-scale.md)
 

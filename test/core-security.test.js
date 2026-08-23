@@ -263,6 +263,66 @@ test("token store persists only SHA-256 digests and enforces expiry, scope, and 
   assert.equal(await store.verify(expiring.token, { tokenSet: "personal" }), null);
 });
 
+test("token scope authorization is canonical, cloned, and recursively frozen", async () => {
+  const store = new TokenStore();
+  const serviceIds = ["calculator"];
+  const methods = ["POST", "GET"];
+  const paths = ["/api/run", "/api/events"];
+  const scope = { serviceIds, methods, paths };
+  const issued = await store.issue({
+    tokenSet: "private-users",
+    expiresInSeconds: 60,
+    scope,
+  });
+
+  assert.deepEqual(issued.scope, {
+    serviceIds: ["calculator"],
+    methods: ["GET", "POST"],
+    paths: ["/api/events", "/api/run"],
+  });
+  assert.equal(Object.isFrozen(issued.scope), true);
+  for (const claim of Object.values(issued.scope)) assert.equal(Object.isFrozen(claim), true);
+
+  serviceIds[0] = "renderer";
+  methods.splice(0, methods.length, "DELETE");
+  paths.splice(0, paths.length, "/api/admin");
+  scope.serviceIds = ["renderer"];
+  assert.throws(() => issued.scope.methods.push("DELETE"), TypeError);
+  assert.throws(() => issued.scope.paths.splice(0, 1, "/api/admin"), TypeError);
+  assert.throws(() => { issued.scope.serviceIds = ["renderer"]; }, TypeError);
+
+  const context = {
+    serviceId: "calculator",
+    method: "POST",
+    path: "/api/run",
+  };
+  const verified = await store.verify(issued.token, {
+    tokenSet: "private-users",
+    context,
+  });
+  assert.ok(verified);
+  assert.equal(Object.isFrozen(verified.scope), true);
+  for (const claim of Object.values(verified.scope)) assert.equal(Object.isFrozen(claim), true);
+  assert.throws(() => { verified.scope.methods[0] = "DELETE"; }, TypeError);
+
+  const listed = store.list()[0];
+  assert.equal(Object.isFrozen(listed.scope), true);
+  for (const claim of Object.values(listed.scope)) assert.equal(Object.isFrozen(claim), true);
+  assert.throws(() => listed.scope.paths.push("/api/admin"), TypeError);
+
+  assert.ok(await store.verify(issued.token, { tokenSet: "private-users", context }));
+  for (const deniedContext of [
+    { ...context, serviceId: "renderer" },
+    { ...context, method: "DELETE" },
+    { ...context, path: "/api/admin" },
+  ]) {
+    assert.equal(await store.verify(issued.token, {
+      tokenSet: "private-users",
+      context: deniedContext,
+    }), null);
+  }
+});
+
 test("generated relay capabilities contain at least 256 random bits", () => {
   const token = generateCapabilityToken("relay");
   assert.match(token, /^relay_[A-Za-z0-9_-]{43}$/u);

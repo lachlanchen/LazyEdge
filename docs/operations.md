@@ -22,7 +22,7 @@ npx @lazyingart/lazyedge doctor --config ./lazyedge.yaml --role edge
 npx @lazyingart/lazyedge doctor --config ./lazyedge.yaml --role worker
 ```
 
-Run the `edge` doctor on the public gateway and the `worker` doctor on the private compute host. `--role all` is only for a genuinely co-located deployment. Run commands with the exact release you reviewed in production; an unpinned `npx` resolves the current registry version. Version `0.1` does not implement remote `apply`, `rollback`, `uninstall`, or `status`. It renders inspectable native artifacts; an authorized administrator validates and installs them deliberately.
+Run the `edge` doctor on the public gateway and the `worker` doctor on the private compute host. `--role all` is only for a genuinely co-located deployment. Run commands with the exact release you reviewed in production; an unpinned `npx` resolves the current registry version. The current preview CLI does not implement remote `apply`, `rollback`, `uninstall`, or `status`. It renders inspectable native artifacts; an authorized administrator validates and installs them deliberately.
 
 ## Coexisting with an existing website
 
@@ -152,15 +152,10 @@ Health checks should be cheap and disclose no model list, filesystem path, build
 
 ## Updating
 
-### Optional chat overlay on an existing edge
-
-Adding a `chat` block changes the manifest digest. If live edge/redirect/nft
-ownership was created from the primary manifest, leave that manifest and those
-units untouched. Copy it to `/etc/lazyedge-chat/lazyedge.yaml`, add only chat,
-record both digests, and use the overlay only to render Caddy and
-`lazyedge-chat.service`. Do not render or apply NAT, the redirect helper, or the
-edge/worker/tunnel units from the overlay without a separate reviewed ownership
-migration. Follow the complete [private-chat overlay procedure](private-chat.md#existing-deployment-immutable-overlay-rule).
+For the breaking separation of v0.2 private chat from the proposed
+transport-only v0.3, follow the dedicated
+[upgrade guide](upgrading-v0.2-to-v0.3.md). That guide describes an unreleased
+candidate, not an available release or deployment.
 
 1. Read release notes and diff the manifest/schema changes.
 2. Back up only the current config, generated units, token metadata, and last-known-good digest—not live tokens in a shared archive.

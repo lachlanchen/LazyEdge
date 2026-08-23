@@ -33,7 +33,6 @@ flowchart LR
 - **فصل بيانات الاعتماد:** رموز العميل والترحيل والخدمة الخلفية ومفاتيح SSH مختلفة وتبقى خارج ملف التعريف.
 - **ناقل قابل للاستبدال:** يبدأ المشروع بـ OpenSSH، بينما يبقى عقد التطبيق منفصلًا عن WireGuard أو rathole أو frp مستقبلًا.
 - **حافة قابلة للنقل:** ولّد المشروع نفسه على سحابة ثانية، وصِلها بالتوازي، واختبرها، ثم انقل DNS.
-- **دردشة خاصة اختيارية (معاينة v0.2):** يوفّر BFF مخصصًا على loopback تطبيق PWA قابلًا للتثبيت بواجهة مضيئة افتراضيًا/داكنة، وبثًا نصيًا تدريجيًا، وتذكّر تسجيل الدخول اختياريًا مع دعم مدير كلمات مرور المتصفح، وMarkdown آمن وKaTeX بلا اتصال من المصدر نفسه، مع إبقاء رموز API ومسارات النموذج الخام على الخادم.
 
 يعمل LazyEdge في مجال شبيه بنفق عكسي على غرار ngrok، لكنه أضيق عمدًا: يعرض الإصدار التجريبي v0.2 مسارات HTTP API مُراجعة، لا منافذ TCP عشوائية ولا عناوين عامة مؤقتة. راجع [المفاهيم على نطاق واسع](../docs/concepts-at-scale.md) لخريطة التقنيات.
 
@@ -62,7 +61,7 @@ npx @lazyingart/lazyedge render accounts --config ./lazyedge.yaml \
 npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 ```
 
-يستخدم أمر Caddy أعلاه HTTPS التلقائي. أضف `--manual-certificates` فقط عند وجود بنية Certbot سابقة في `/etc/letsencrypt/live/<host>/`. يتطلب مولّد الحساب مفتاح Ed25519 عامًا مخصصًا؛ وتشير مسارات OpenSSH إلى ملفات العامل الخاصة من دون نسخ محتواها. يُخرج أمر systemd حزمة مراجعة بعناوين، أو يقبل `--component edge|worker|tunnel|caddy|redirect|certbot|chat` لقسم واحد.
+يستخدم أمر Caddy أعلاه HTTPS التلقائي. أضف `--manual-certificates` فقط عند وجود بنية Certbot سابقة في `/etc/letsencrypt/live/<host>/`. يتطلب مولّد الحساب مفتاح Ed25519 عامًا مخصصًا؛ وتشير مسارات OpenSSH إلى ملفات العامل الخاصة من دون نسخ محتواها. يُخرج أمر systemd حزمة مراجعة بعناوين، أو يقبل `--component edge|worker|tunnel|caddy|redirect|certbot` لقسم واحد.
 
 افصل ملفات الربط حسب حدود الثقة: ضع [مثال edge](../examples/local-llm/bindings.edge.example.yaml) على البوابة العامة فقط، و[مثال worker](../examples/local-llm/bindings.worker.example.yaml) على الحوسبة الخاصة فقط. يقرأ كل تشغيل أسرار دوره وحدها؛ لا يحتاج أي طرف إلى مخزن بيانات اعتماد الطرف الآخر.
 
@@ -89,7 +88,7 @@ npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 - [الأمان ونموذج التهديد](../docs/security.md)
 - [التشغيل والتراجع](../docs/operations.md)
 - [النقل من Alibaba إلى Huawei أو تشغيل حافتين](../docs/migration.md)
-- [تكامل LocalLLM وAgInTi](../docs/integrations/local-llm-aginti.md)
+- [عملاء متوافقون مع OpenAI](../docs/integrations/openai-compatible-clients.md)
 - [استكشاف الأخطاء](../docs/troubleshooting.md)
 - [علاقة الأنظمة الكبيرة متعددة الخوادم](../docs/concepts-at-scale.md)
 

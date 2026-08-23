@@ -4,6 +4,13 @@ import path from "node:path";
 
 import { parseDocument } from "yaml";
 
+const SERVICE_ID_PATTERN = /^[a-z][a-z0-9-]{0,62}$/u;
+const BINDING_FIELDS = new Set([
+  "relaySecretFile",
+  "upstreamAuthorizationFile",
+  "clientTokenStore",
+]);
+
 function expandHome(value) {
   if (value === "~") return os.homedir();
   if (value.startsWith("~/")) return path.join(os.homedir(), value.slice(2));
@@ -49,7 +56,35 @@ export async function readPrivateText(filePath, label = "secret file") {
   return value;
 }
 
-export async function loadBindings(filePath) {
+function runtimeBindingPolicy(options) {
+  if (options === undefined) return undefined;
+  const policy = plainObject(options, "bindings policy");
+  knownKeys(policy, new Set(["role", "declaredServiceIds"]), "bindings policy");
+  if (policy.role !== "edge" && policy.role !== "worker") {
+    throw new Error("bindings policy role must be edge or worker");
+  }
+  if (
+    !Array.isArray(policy.declaredServiceIds)
+    || policy.declaredServiceIds.length === 0
+    || policy.declaredServiceIds.length > 128
+  ) {
+    throw new Error("bindings policy declaredServiceIds must be a bounded non-empty array");
+  }
+  const declaredServiceIds = new Set();
+  for (const serviceId of policy.declaredServiceIds) {
+    if (typeof serviceId !== "string" || !SERVICE_ID_PATTERN.test(serviceId)) {
+      throw new Error("bindings policy contains an invalid declared service id");
+    }
+    if (declaredServiceIds.has(serviceId)) {
+      throw new Error(`bindings policy contains duplicate service id ${serviceId}`);
+    }
+    declaredServiceIds.add(serviceId);
+  }
+  return Object.freeze({ role: policy.role, declaredServiceIds });
+}
+
+export async function loadBindings(filePath, options) {
+  const policy = runtimeBindingPolicy(options);
   const resolved = privatePath(filePath, "bindings path");
   const metadata = await lstat(resolved);
   if (!metadata.isFile() || metadata.isSymbolicLink()) {
@@ -70,15 +105,24 @@ export async function loadBindings(filePath) {
   const source = plainObject(root.bindings, "bindings");
   const bindings = new Map();
   for (const [serviceId, rawBinding] of Object.entries(source)) {
-    if (!/^[a-z][a-z0-9-]{0,62}$/u.test(serviceId)) {
+    if (!SERVICE_ID_PATTERN.test(serviceId)) {
       throw new Error(`Invalid binding service id ${serviceId}`);
     }
+    if (policy && !policy.declaredServiceIds.has(serviceId)) {
+      throw new Error(`bindings.${serviceId} is not declared by the manifest`);
+    }
     const binding = plainObject(rawBinding, `bindings.${serviceId}`);
-    knownKeys(
-      binding,
-      new Set(["relaySecretFile", "upstreamAuthorizationFile", "clientTokenStore"]),
-      `bindings.${serviceId}`,
-    );
+    if (policy?.role === "edge" && Object.hasOwn(binding, "upstreamAuthorizationFile")) {
+      throw new Error(
+        `bindings.${serviceId}.upstreamAuthorizationFile is worker-only and cannot be used by edge`,
+      );
+    }
+    if (policy?.role === "worker" && Object.hasOwn(binding, "clientTokenStore")) {
+      throw new Error(
+        `bindings.${serviceId}.clientTokenStore is edge-only and cannot be used by worker`,
+      );
+    }
+    knownKeys(binding, BINDING_FIELDS, `bindings.${serviceId}`);
     const normalized = {};
     for (const key of ["relaySecretFile", "upstreamAuthorizationFile", "clientTokenStore"]) {
       if (binding[key] !== undefined) normalized[key] = privatePath(binding[key], key);

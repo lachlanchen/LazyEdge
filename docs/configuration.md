@@ -65,6 +65,9 @@ Unknown keys are rejected rather than silently ignored.
 | `gatewayListen` | exact `127.0.0.1:PORT` listener for the edge guard |
 | `compatibilityListen` | optional loopback-only adapter for one explicitly selected service used by a cloud-local application; it does not bypass token or route policy |
 | `compatibilityService` | service ID used by `compatibilityListen`; inferred only when the manifest has exactly one service and required otherwise |
+| `privateListeners[]` | optional bounded application-neutral loopback listeners; each entry selects one unique service and exact listener |
+| `privateListeners[].service` | configured `exposure: private` service ID selected at manifest validation time, never by a request or CLI override; public services are rejected |
+| `privateListeners[].listen` | exact unique `127.0.0.1:PORT` with canonical decimal `PORT` in 1024–65535; wildcard, privileged/zero/leading-zero ports and collisions are rejected |
 | `httpPort` / `httpsPort` | optional unprivileged Caddy ports, both 1024–65535; defaults are `10080` / `10443` |
 | `existingSites[]` | sites that generated Caddy output must preserve and forward to existing loopback upstreams |
 | `existingSites[].host` | exact DNS hostname |
@@ -90,8 +93,9 @@ The renderer must preserve strict host-key verification, request failure when a 
 | Field | Meaning |
 | --- | --- |
 | `id` | stable lowercase identifier |
+| `exposure` | `public` (default) or `private`; controls public ingress independently of the route contract |
 | `profile` | `localllm-openai` or `generic-http` |
-| `domains[]` | exact public DNS names; no wildcard or IP literal |
+| `domains[]` | one or more exact public DNS names for public exposure; exactly `[]` for private exposure |
 | `edge.upstream` | exact `http://127.0.0.1:PORT` URL reached by the edge guard |
 | `worker.listen` | exact `127.0.0.1:PORT` worker guard listener |
 | `worker.target` | exact `http://127.0.0.1:PORT` private upstream URL |
@@ -101,11 +105,16 @@ The renderer must preserve strict host-key verification, request failure when a 
 | `public.maxBodyBytes` | 1 byte–1 GiB request limit |
 | `public.maxConcurrentRequests` | 1–1024 admitted requests; choose a measured, small value |
 | `public.idleTimeoutSeconds` | 1–86400 seconds; align with proxy/client/upstream timeouts |
-| `chat` | optional private browser-chat BFF; allowed only for `localllm-openai` |
 
 The profile may be omitted, which behaves as `generic-http`. The `localllm-openai` profile permits only a chosen subset of the four reviewed OpenAI-compatible routes shown above. It deliberately keeps health private. `generic-http` remains exact-path only and is intended for reviewed APIs such as Whisper or SoVITS—not arbitrary TCP forwarding.
 
-An optional `chat` block requires exactly one public domain, requires this service to own `spec.edge.compatibilityListen`, and requires `GET /v1/models` plus `POST /v1/chat/completions`. It accepts exact-loopback `listen` (default `127.0.0.1:17610`), a non-secret `username`, a 1 KiB–2 MiB browser body cap, `defaultModel` (`deep`, `fast`, or `code`), and stable alias targets under `models.deep`, `models.fast`, and `models.code`. The v0.2-preview BFF additionally receives a password verifier, narrowly scoped BFF client token, and independent remembered-session secret as separate service-manager credentials; these values never belong in the manifest. It serves only the reviewed browser PWA contract and bridges completions as text-only HTTP/SSE. See [private chat](private-chat.md). A chat overlay for an existing live edge has a different manifest digest and must not replace the primary digest-owned manifest.
+The backwards-compatible `public` object names the external-client token,
+route, body, concurrency and timeout contract even when `exposure: private`.
+Private exposure requires one matching `spec.edge.privateListeners` entry and
+produces no DNS, Caddy, certificate or NAT ingress. Public exposure keeps the
+existing non-empty domain contract and cannot add a private listener. This
+prevents a hostless private capability from authorizing the same service's
+public route. See [private service listeners](private-service-listeners.md).
 
 ## Bindings and secrets
 
@@ -137,7 +146,7 @@ Never put a secret value in YAML, an environment file committed to Git, a URL, a
 
 ## Route semantics
 
-Configured paths are canonical, exact absolute paths. Wildcards, repeated separators, traversal components, encoded separators, query strings in route declarations, and fragments are rejected. A query string on an otherwise approved request path is forwarded, but it is not part of route matching and cannot turn one declared path into another.
+Configured paths are canonical, exact absolute paths. Wildcards, repeated separators, traversal components, encoded separators, query strings in route declarations, and fragments are rejected. The public gateway and legacy compatibility listener preserve their existing behavior: a query string on an otherwise approved path is forwarded but cannot select another path. Application-neutral private listeners reject every query string because the current route schema has no query declaration.
 
 Methods are uppercase and limited to `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, and `OPTIONS`. Listing a path does not imply all methods.
 

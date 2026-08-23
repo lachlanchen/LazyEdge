@@ -33,7 +33,6 @@ flowchart LR
 - **認証情報の分離：** クライアント、リレー、上流、SSH の認証情報は別々で、マニフェスト外に置きます。
 - **交換可能な転送層：** まず OpenSSH を使用し、アプリケーション契約は将来の WireGuard、rathole、frp から分離します。
 - **移行可能なエッジ：** 同じレビュー済みプロジェクトを別のクラウドで生成し、並行接続して検証した後に DNS を移します。
-- **任意のプライベートチャット（v0.2 プレビュー）：** 専用の loopback BFF が、既定で明るい/ダークのインストール可能な PWA、増分テキストストリーミング、任意のログイン保持とブラウザーのパスワードマネージャー対応、安全な Markdown と同一オリジンのオフライン KaTeX を提供します。API トークンと生のモデルルートはサーバー側に残ります。
 
 LazyEdge は ngrok 型リバーストンネルと同じ問題領域を扱いますが、意図的に範囲を限定しています。v0.2 プレビューが公開するのはレビュー済み HTTP API ルートであり、任意の TCP ポートやその場限りの公開 URL ではありません。技術の位置付けは[大規模システムの概念](../docs/concepts-at-scale.md)を参照してください。
 
@@ -62,7 +61,7 @@ npx @lazyingart/lazyedge render accounts --config ./lazyedge.yaml \
 npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 ```
 
-上の Caddy コマンドは Automatic HTTPS を使用します。既存の Certbot 構成が `/etc/letsencrypt/live/<host>/` にある場合だけ `--manual-certificates` を追加してください。アカウントレンダラーには専用 Ed25519 公開鍵が必要です。OpenSSH のパスはワーカー上の非公開ファイルを指すだけで、内容を複製しません。systemd コマンドは見出し付きレビュー用バンドルを出力し、`--component edge|worker|tunnel|caddy|redirect|certbot|chat` で一つのセクションも選べます。
+上の Caddy コマンドは Automatic HTTPS を使用します。既存の Certbot 構成が `/etc/letsencrypt/live/<host>/` にある場合だけ `--manual-certificates` を追加してください。アカウントレンダラーには専用 Ed25519 公開鍵が必要です。OpenSSH のパスはワーカー上の非公開ファイルを指すだけで、内容を複製しません。systemd コマンドは見出し付きレビュー用バンドルを出力し、`--component edge|worker|tunnel|caddy|redirect|certbot` で一つのセクションも選べます。
 
 バインディングは信頼境界ごとに分離してください。[edge の例](../examples/local-llm/bindings.edge.example.yaml)は公開ゲートウェイだけに、[worker の例](../examples/local-llm/bindings.worker.example.yaml)は非公開計算ホストだけに置きます。各ランタイムは自分の役割に必要な認証情報だけを読み、相手側の認証情報ストアを必要としません。
 
@@ -89,7 +88,7 @@ npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 - [セキュリティと脅威モデル](../docs/security.md)
 - [運用とロールバック](../docs/operations.md)
 - [Alibaba → Huawei またはデュアルエッジ移行](../docs/migration.md)
-- [LocalLLM + AgInTi 連携](../docs/integrations/local-llm-aginti.md)
+- [OpenAI 互換クライアント](../docs/integrations/openai-compatible-clients.md)
 - [トラブルシューティング](../docs/troubleshooting.md)
 - [大規模な複数サーバーシステムとの関係](../docs/concepts-at-scale.md)
 

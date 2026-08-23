@@ -1,0 +1,40 @@
+apiVersion: lazyedge.lazying.art/v1alpha1
+kind: EdgeProject
+
+metadata:
+  name: private-service-edge
+
+spec:
+  edge:
+    gatewayListen: 127.0.0.1:17600
+    privateListeners:
+      - service: private-service
+        listen: 127.0.0.1:18120
+
+  transport:
+    provider: openssh-reverse
+    sshHost: edge.example.com
+    sshUser: lazyedge-tunnel
+    sshPort: 22
+
+  services:
+    - id: private-service
+      # privateListeners may select only services whose exposure is private.
+      exposure: private
+      domains: []
+      edge:
+        upstream: http://127.0.0.1:18020
+      worker:
+        listen: 127.0.0.1:17820
+        target: http://127.0.0.1:8100
+        healthPath: /healthz
+      public:
+        tokenSet: private-service-users
+        maxBodyBytes: 1048576
+        maxConcurrentRequests: 2
+        idleTimeoutSeconds: 120
+        routes:
+          - path: /v1/capabilities
+            methods: [GET]
+          - path: /v1/jobs
+            methods: [POST]

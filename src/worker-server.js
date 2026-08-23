@@ -51,21 +51,44 @@ async function beginListening(server, listener) {
   });
 }
 
-function handle(server, service) {
+function handle(server, service, activeSockets, activeExchanges) {
   const address = server.address();
   const formattedHost = address.family === "IPv6" ? `[${address.address}]` : address.address;
+  let closePromise;
+  const closeOwnedConnections = () => {
+    for (const { request, response } of activeExchanges) {
+      if (!response.destroyed) response.destroy();
+      if (!request.destroyed) request.destroy();
+    }
+    server.closeIdleConnections?.();
+    server.closeAllConnections?.();
+    for (const socket of activeSockets) {
+      if (!socket.destroyed) socket.destroy();
+    }
+  };
+  const close = () => {
+    if (closePromise !== undefined) return closePromise;
+    closePromise = new Promise((resolve, reject) => {
+      if (!server.listening) {
+        closeOwnedConnections();
+        resolve();
+        return;
+      }
+      server.close((error) => {
+        closeOwnedConnections();
+        if (error) reject(error);
+        else resolve();
+      });
+      closeOwnedConnections();
+    });
+    return closePromise;
+  };
   return Object.freeze({
     server,
     service,
     address: Object.freeze({ host: address.address, port: address.port }),
     url: `http://${formattedHost}:${address.port}`,
-    async close() {
-      if (!server.listening) return;
-      await new Promise((resolve, reject) => {
-        server.close((error) => (error ? reject(error) : resolve()));
-        server.closeIdleConnections?.();
-      });
-    },
+    close,
   });
 }
 
@@ -92,8 +115,19 @@ export async function startWorkerServer({
     `upstream capability for ${service.id}`,
   );
   let concurrent = 0;
+  const activeSockets = new Set();
+  const activeExchanges = new Set();
 
   const server = http.createServer(async (request, response) => {
+    const exchange = { request, response };
+    const releaseExchange = () => {
+      activeExchanges.delete(exchange);
+      response.off("finish", releaseExchange);
+      response.off("close", releaseExchange);
+    };
+    activeExchanges.add(exchange);
+    response.once("finish", releaseExchange);
+    response.once("close", releaseExchange);
     response.setHeader("cache-control", "no-store");
     const suppliedRelay = getBearerFromRequest(request, RELAY_HEADER);
     if (suppliedRelay === null || !constantTimeEqual(suppliedRelay, expectedRelay)) {
@@ -136,15 +170,26 @@ export async function startWorkerServer({
   server.headersTimeout = 15_000;
   server.requestTimeout = 0;
   server.keepAliveTimeout = 5_000;
+  server.on("connection", (socket) => {
+    activeSockets.add(socket);
+    socket.once("close", () => activeSockets.delete(socket));
+  });
   server.on("clientError", (_error, socket) => {
     if (socket.writable) socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
   });
 
   const listener = runtimeListen(listen, service.worker.listen);
   await beginListening(server, listener);
+  const workerHandle = handle(server, service, activeSockets, activeExchanges);
   if (signal) {
-    if (signal.aborted) await new Promise((resolve) => server.close(resolve));
-    else signal.addEventListener("abort", () => server.close(), { once: true });
+    if (signal.aborted) await workerHandle.close();
+    else {
+      const onAbort = () => {
+        workerHandle.close().catch(() => {});
+      };
+      signal.addEventListener("abort", onAbort, { once: true });
+      server.once("close", () => signal.removeEventListener("abort", onAbort));
+    }
   }
-  return handle(server, service);
+  return workerHandle;
 }

@@ -33,7 +33,6 @@ flowchart LR
 - **Разделение учётных данных:** данные клиента, relay, upstream и SSH различны и хранятся вне манифеста.
 - **Заменяемый транспорт:** сначала OpenSSH; контракт приложения отделён от будущего транспорта WireGuard, rathole или frp.
 - **Переносимый edge:** создайте тот же проверенный проект во втором облаке, подключите и протестируйте его параллельно, затем переключите DNS.
-- **Необязательный приватный чат (preview v0.2):** выделенный BFF на loopback даёт устанавливаемую PWA со светлой по умолчанию/тёмной темой, постепенной потоковой выдачей текста, необязательным запоминанием входа и поддержкой менеджера паролей браузера, а также безопасным Markdown и офлайн-KaTeX того же origin; API-токены и необработанные маршруты модели остаются на сервере.
 
 LazyEdge решает похожую задачу, что и обратный туннель в стиле ngrok, но намеренно имеет более узкую область: preview v0.2 публикует проверенные маршруты HTTP API, а не произвольные TCP-порты или временные публичные URL. Общую карту технологий см. в разделе [концепции в масштабе](../docs/concepts-at-scale.md).
 
@@ -62,7 +61,7 @@ npx @lazyingart/lazyedge render accounts --config ./lazyedge.yaml \
 npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 ```
 
-Приведённая команда Caddy использует Automatic HTTPS. Добавляйте `--manual-certificates` только для существующей структуры Certbot в `/etc/letsencrypt/live/<host>/`. Генератор учётных записей требует отдельный открытый ключ Ed25519; пути OpenSSH ссылаются на закрытые файлы worker и не копируют их содержимое. Команда systemd выдаёт размеченный пакет для проверки либо принимает `--component edge|worker|tunnel|caddy|redirect|certbot|chat` для одного раздела.
+Приведённая команда Caddy использует Automatic HTTPS. Добавляйте `--manual-certificates` только для существующей структуры Certbot в `/etc/letsencrypt/live/<host>/`. Генератор учётных записей требует отдельный открытый ключ Ed25519; пути OpenSSH ссылаются на закрытые файлы worker и не копируют их содержимое. Команда systemd выдаёт размеченный пакет для проверки либо принимает `--component edge|worker|tunnel|caddy|redirect|certbot` для одного раздела.
 
 Разделяйте привязки по границе доверия: размещайте [пример edge](../examples/local-llm/bindings.edge.example.yaml) только на публичном шлюзе, а [пример worker](../examples/local-llm/bindings.worker.example.yaml) — только на частном вычислительном узле. Каждый процесс читает лишь учётные данные своей роли; хранилище другой роли ему не требуется.
 
@@ -89,7 +88,7 @@ npx @lazyingart/lazyedge render systemd --config ./lazyedge.yaml
 - [Безопасность и модель угроз](../docs/security.md)
 - [Эксплуатация и откат](../docs/operations.md)
 - [Миграция Alibaba → Huawei или dual-edge](../docs/migration.md)
-- [Интеграция LocalLLM + AgInTi](../docs/integrations/local-llm-aginti.md)
+- [OpenAI-совместимые клиенты](../docs/integrations/openai-compatible-clients.md)
 - [Устранение неполадок](../docs/troubleshooting.md)
 - [Связь с крупными многосерверными системами](../docs/concepts-at-scale.md)
 
