@@ -343,3 +343,131 @@ test("private runtime inputs reject world-readable files and symlinks", async ()
   await chmod(bindingsPath, 0o644);
   await assert.rejects(loadBindings(bindingsPath), /other users/u);
 });
+
+test("serve rejects bindings outside the selected role and manifest", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "lazyedge-role-bindings-"));
+  const manifestPath = path.join(directory, "lazyedge.yaml");
+  const initialized = await invoke(["init", "--output", manifestPath]);
+  assert.equal(initialized.code, 0, initialized.stderr);
+
+  const validEdgePath = path.join(directory, "valid-edge.yaml");
+  await writeFile(validEdgePath, [
+    "bindings:",
+    "  local-llm:",
+    "    relaySecretFile: /private/relay",
+    "    clientTokenStore: /private/tokens.json",
+    "",
+  ].join("\n"), { mode: 0o600 });
+  const validEdge = await loadBindings(validEdgePath, {
+    role: "edge",
+    declaredServiceIds: ["local-llm"],
+  });
+  assert.deepEqual(validEdge.get("local-llm"), {
+    relaySecretFile: "/private/relay",
+    clientTokenStore: "/private/tokens.json",
+  });
+
+  const validWorkerPath = path.join(directory, "valid-worker.yaml");
+  await writeFile(validWorkerPath, [
+    "bindings:",
+    "  local-llm:",
+    "    relaySecretFile: /private/relay",
+    "    upstreamAuthorizationFile: /private/upstream",
+    "",
+  ].join("\n"), { mode: 0o600 });
+  const validWorker = await loadBindings(validWorkerPath, {
+    role: "worker",
+    declaredServiceIds: ["local-llm"],
+  });
+  assert.deepEqual(validWorker.get("local-llm"), {
+    relaySecretFile: "/private/relay",
+    upstreamAuthorizationFile: "/private/upstream",
+  });
+
+  const cases = [
+    {
+      name: "edge rejects worker-only fields",
+      role: "edge",
+      yaml: [
+        "bindings:",
+        "  local-llm:",
+        "    relaySecretFile: /private/relay",
+        "    upstreamAuthorizationFile: /private/upstream",
+        "",
+      ].join("\n"),
+      error: /upstreamAuthorizationFile is worker-only and cannot be used by edge/u,
+    },
+    {
+      name: "worker rejects edge-only fields",
+      role: "worker",
+      yaml: [
+        "bindings:",
+        "  local-llm:",
+        "    relaySecretFile: /private/relay",
+        "    clientTokenStore: /private/tokens.json",
+        "",
+      ].join("\n"),
+      error: /clientTokenStore is edge-only and cannot be used by worker/u,
+    },
+    {
+      name: "edge rejects undeclared fields",
+      role: "edge",
+      yaml: [
+        "bindings:",
+        "  local-llm:",
+        "    relaySecretFile: /private/relay",
+        "    command: /private/not-allowed",
+        "",
+      ].join("\n"),
+      error: /contains unknown field command/u,
+    },
+    {
+      name: "worker rejects undeclared fields",
+      role: "worker",
+      yaml: [
+        "bindings:",
+        "  local-llm:",
+        "    relaySecretFile: /private/relay",
+        "    command: /private/not-allowed",
+        "",
+      ].join("\n"),
+      error: /contains unknown field command/u,
+    },
+    {
+      name: "edge rejects undeclared services",
+      role: "edge",
+      yaml: [
+        "bindings:",
+        "  shadow-service:",
+        "    relaySecretFile: /private/relay",
+        "    clientTokenStore: /private/tokens.json",
+        "",
+      ].join("\n"),
+      error: /shadow-service is not declared by the manifest/u,
+    },
+    {
+      name: "worker rejects undeclared services",
+      role: "worker",
+      yaml: [
+        "bindings:",
+        "  shadow-service:",
+        "    relaySecretFile: /private/relay",
+        "    upstreamAuthorizationFile: /private/upstream",
+        "",
+      ].join("\n"),
+      error: /shadow-service is not declared by the manifest/u,
+    },
+  ];
+
+  for (const testCase of cases) {
+    const bindingsPath = path.join(directory, `${testCase.role}-${testCase.name}.yaml`);
+    await writeFile(bindingsPath, testCase.yaml, { mode: 0o600 });
+    const result = await invoke([
+      "serve", testCase.role,
+      "--config", manifestPath,
+      "--bindings", bindingsPath,
+    ]);
+    assert.equal(result.code, 1, `${testCase.name}: ${result.stderr}`);
+    assert.match(result.stderr, testCase.error, testCase.name);
+  }
+});

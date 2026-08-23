@@ -1,6 +1,6 @@
 # Security policy
 
-LazyEdge is an early-stage security-sensitive project. Only the latest released `0.1.x` version receives fixes while the interface is experimental.
+LazyEdge is an early-stage security-sensitive project. Only the latest published release line receives fixes while the interface is experimental. An unreleased branch or pull request is not a supported release; consult the GitHub and npm release metadata before deploying.
 
 ## Report a vulnerability
 

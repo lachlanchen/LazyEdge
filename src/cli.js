@@ -587,7 +587,10 @@ async function secretCommand(action, options, stdout) {
 }
 
 async function runtimeMaps(manifest, bindingsPath, role, selectedServiceId) {
-  const bindings = await loadBindings(bindingsPath);
+  const bindings = await loadBindings(bindingsPath, {
+    role,
+    declaredServiceIds: manifest.spec.services.map((service) => service.id),
+  });
   const relayTokens = new Map();
   const upstreamTokens = new Map();
   const tokenStores = new Map();

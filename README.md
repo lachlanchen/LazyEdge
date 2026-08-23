@@ -88,6 +88,7 @@ The `v1alpha1` interface is preview. Version 0.2 does not ship remote `apply`, `
 - [Configuration reference](docs/configuration.md)
 - [Security and threat model](docs/security.md)
 - [Operations and rollback](docs/operations.md)
+- [Upgrade v0.2 to the proposed transport-only v0.3](docs/upgrading-v0.2-to-v0.3.md)
 - [Alibaba → Huawei or dual-edge migration](docs/migration.md)
 - [OpenAI-compatible client integration](docs/integrations/openai-compatible-clients.md)
 - [Application-neutral private service listeners](docs/private-service-listeners.md)

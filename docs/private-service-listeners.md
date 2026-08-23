@@ -2,9 +2,10 @@
 
 ## Status
 
-This transport-only seam is implemented on the current development branch. It
-is not part of the published v0.2.0 package, has not been deployed by this
-documentation change, and must not be cited as production acceptance evidence.
+This page documents an unreleased pull-request implementation proposed for a
+future transport-only v0.3. It is not part of the published v0.2.0 package.
+Merge, documentation, and test evidence do not mean release or deployment, and
+must not be cited as production acceptance evidence.
 
 ## Problem
 
