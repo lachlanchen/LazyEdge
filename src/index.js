@@ -9,6 +9,7 @@ export * from "./caddy.js";
 export * from "./doctor.js";
 export * from "./edge-server.js";
 export * from "./http-policy.js";
+export * from "./node-admission.js";
 export * from "./openssh.js";
 export * from "./runtime-config.js";
 export * from "./security.js";

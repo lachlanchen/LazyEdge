@@ -1,4 +1,5 @@
 import {
+  LOCALLLM_NODE_ADMISSION_PROFILE,
   LOCALLLM_OPENAI_PROFILE,
   manifestDigest,
   normalizeManifest,
@@ -256,7 +257,10 @@ export function renderCaddy(input, {
     if ((service.exposure ?? "public") !== "public") continue;
     for (const host of service.domains) {
       const current = managedSites.get(host) ?? { landing: false };
-      if (service.profile === LOCALLLM_OPENAI_PROFILE) current.landing = true;
+      if (
+        service.profile === LOCALLLM_OPENAI_PROFILE
+        || service.profile === LOCALLLM_NODE_ADMISSION_PROFILE
+      ) current.landing = true;
       managedSites.set(host, current);
     }
   }

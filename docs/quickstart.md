@@ -24,16 +24,30 @@ npx @lazyingart/lazyedge init --output lazyedge.yaml
 
 `init` creates one secret-free `lazyedge.yaml`. Open the manifest and replace example hosts and ports. The v0.3 preview requires exact IPv4 loopback listeners such as `127.0.0.1:18008`; never use `0.0.0.0`, `::1`, a LAN address, or a raw public target.
 
-For a LocalLLM/OpenAI-compatible service, use `profile: localllm-openai`. That profile admits only a chosen subset of this reviewed four-route set:
+For an inference-only LocalLLM/OpenAI-compatible service, use
+`profile: localllm-openai`. To let an authenticated coordinator make a
+release-bound node admission decision, use
+`profile: localllm-openai-admission`; that opt-in profile requires both `GET /readyz` and
+`GET /api/node/capabilities` in addition to any chosen subset of this reviewed
+four-route inference set:
 
 - `GET /v1/models`
 - `POST /v1/chat/completions`
 - `POST /v1/responses`
 - `POST /v1/embeddings`
 
-Its health path is private and must not overlap `/v1/`. Use `generic-http` for another HTTP API and enumerate every allowed path and method exactly; wildcards remain forbidden.
+The admission routes are exact and bearer-authenticated at the public or
+edge-local client boundary; they do not expose another `/api` route. The
+private `worker.healthPath` is transport health only and must not overlap any
+public route. In particular, LocalLLM's compatibility `/healthz` response is
+not node-admission evidence. Use `generic-http` for another HTTP API and
+enumerate every allowed path and method exactly; wildcards remain forbidden.
 
-On a managed `localllm-openai` hostname, Caddy serves a small static information page for exact `GET /` and `HEAD /` requests. The `/v1` prefix remains the authenticated default-deny API path; LocalLLM Studio, `/api`, Ollama, and other management routes are not published.
+On either managed LocalLLM profile, Caddy serves a small static information
+page for exact `GET /` and `HEAD /` requests. Inference remains under the
+authenticated `/v1` contract. The admission profile adds only the two declared
+authenticated documents; LocalLLM Studio, arbitrary `/api` paths, Ollama, and
+other management routes are not published.
 
 ## 2. Create role-specific secret stores outside the project
 
@@ -218,7 +232,7 @@ npx @lazyingart/lazyedge doctor \
   --role worker
 ```
 
-Use `--role all` only for a deliberately co-located rehearsal where both sets of loopback listeners genuinely exist. `doctor` is read-only and a failed check is evidence to diagnose, not permission to weaken a boundary.
+Use `--role all` only for a deliberately co-located rehearsal where both sets of loopback listeners genuinely exist. `doctor` is read-only and a failed check is evidence to diagnose, not permission to weaken a boundary. With `localllm-openai-admission`, the worker report separates `boundaries.transport` from `boundaries.applicationAdmission`; require both to pass before a coordinator enrolls or switches to the node.
 
 ## 5. Deploy deliberately
 

@@ -182,7 +182,7 @@
           "items": { "$ref": "#/$defs/hostname" }
         },
         "profile": {
-          "enum": ["generic-http", "localllm-openai"]
+          "enum": ["generic-http", "localllm-openai", "localllm-openai-admission"]
         },
         "edge": {
           "type": "object",

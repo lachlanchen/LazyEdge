@@ -19,7 +19,7 @@ spec:
     sshPort: 22
   services:
     - id: local-llm
-      profile: localllm-openai
+      profile: localllm-openai-admission
       domains: [llm.example.com]
       edge:
         upstream: http://127.0.0.1:18008
@@ -41,6 +41,10 @@ spec:
             methods: [POST]
           - path: /v1/embeddings
             methods: [POST]
+          - path: /readyz
+            methods: [GET]
+          - path: /api/node/capabilities
+            methods: [GET]
 ```
 
 See [`examples/local-llm/lazyedge.yaml`](../examples/local-llm/lazyedge.yaml) and the machine-readable [`schemas/lazyedge.schema.json`](../schemas/lazyedge.schema.json).
@@ -94,19 +98,37 @@ The renderer must preserve strict host-key verification, request failure when a 
 | --- | --- |
 | `id` | stable lowercase identifier |
 | `exposure` | `public` (default) or `private`; controls public ingress independently of the route contract |
-| `profile` | `localllm-openai` or `generic-http` |
+| `profile` | `localllm-openai`, `localllm-openai-admission`, or `generic-http` |
 | `domains[]` | one or more exact public DNS names for public exposure; exactly `[]` for private exposure |
 | `edge.upstream` | exact `http://127.0.0.1:PORT` URL reached by the edge guard |
 | `worker.listen` | exact `127.0.0.1:PORT` worker guard listener |
 | `worker.target` | exact `http://127.0.0.1:PORT` private upstream URL |
-| `worker.healthPath` | optional private health path; it cannot overlap public `/v1/` routes |
+| `worker.healthPath` | optional private transport-health path; it cannot overlap any public route |
 | `public.tokenSet` | name resolved to an external token store through bindings |
 | `public.routes[]` | exact path plus unique uppercase HTTP methods |
 | `public.maxBodyBytes` | 1 byte–1 GiB request limit |
 | `public.maxConcurrentRequests` | 1–1024 admitted requests; choose a measured, small value |
 | `public.idleTimeoutSeconds` | 1–86400 seconds; align with proxy/client/upstream timeouts |
 
-The profile may be omitted, which behaves as `generic-http`. The `localllm-openai` profile permits only a chosen subset of the four reviewed OpenAI-compatible routes shown above. It deliberately keeps health private. `generic-http` remains exact-path only and is intended for reviewed APIs such as Whisper or SoVITS—not arbitrary TCP forwarding.
+The profile may be omitted, which behaves as `generic-http`.
+`localllm-openai` permits only a chosen subset of the four reviewed
+OpenAI-compatible inference routes shown above and keeps every health route
+private. `localllm-openai-admission` is the explicit enrollment/switching
+variant: it permits that same inference set and requires both exact claims
+`GET /readyz` and `GET /api/node/capabilities`. Those two documents receive the
+same external bearer-token, relay-token, and worker upstream-token enforcement
+as inference. No other `/api`, readiness, liveness, management, or wildcard path
+is implied. `generic-http` remains exact-path only and is intended for reviewed
+APIs such as Whisper or SoVITS—not arbitrary TCP forwarding.
+
+For the admission profile, `doctor --role worker` reports transport and
+application admission independently. The private `worker.healthPath` proves
+only that the transport can reach its target. Application admission instead
+requires exact HTTP 200, JSON, `Cache-Control: no-store`, matching immutable
+release evidence, a fresh passing configured canary, supported protocols, and
+matching model provenance from `/readyz` plus `/api/node/capabilities`.
+LocalLLM's legacy `/healthz` compatibility document is never admission evidence,
+even when it returns HTTP 200.
 
 The backwards-compatible `public` object names the external-client token,
 route, body, concurrency and timeout contract even when `exposure: private`.
@@ -157,4 +179,4 @@ npx @lazyingart/lazyedge validate --config ./lazyedge.yaml
 npx @lazyingart/lazyedge plan --config ./lazyedge.yaml
 ```
 
-Validation proves that data matches the versioned manifest contract and the CLI's cross-field project invariants, not that DNS, firewall, Caddy, SSH authorization, credentials, or the upstream are correct. The shipped JSON Schema is a machine-readable tooling companion; the CLI normalizer remains authoritative. Run `doctor --role edge` on the gateway and `doctor --role worker` on the private compute host, then use boundary probes and a rollback plan before deployment. Reserve `--role all` for a truly co-located setup.
+Validation proves that data matches the versioned manifest contract and the CLI's cross-field project invariants, not that DNS, firewall, Caddy, SSH authorization, credentials, or the upstream are correct. The shipped JSON Schema is a machine-readable tooling companion; the CLI normalizer remains authoritative. Run `doctor --role edge` on the gateway and `doctor --role worker` on the private compute host, then use boundary probes and a rollback plan before deployment. For the admission profile, require both `boundaries.transport.ok` and `boundaries.applicationAdmission.ok`; one does not substitute for the other. Reserve `--role all` for a truly co-located setup.

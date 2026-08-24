@@ -146,9 +146,18 @@ Observe boundaries separately:
 3. **edge guard:** health endpoint responds locally; forbidden requests are denied.
 4. **tunnel:** the reverse port is listening on `127.0.0.1`, never `0.0.0.0` or `::`.
 5. **worker guard:** relay-authenticated health reaches the worker.
-6. **upstream:** a minimal representative request succeeds without exposing its private credential.
+6. **upstream transport:** the configured private health path is reachable; this is not proof that inference is admissible.
+7. **application admission:** for `localllm-openai-admission`, exact `/readyz` catalog readiness and `/api/node/capabilities` release-bound functional evidence both pass.
 
-Health checks should be cheap and disclose no model list, filesystem path, build secret, or private inventory.
+The doctor result reports `boundaries.transport` and
+`boundaries.applicationAdmission` separately. A transport pass never overrides
+stale, failed, reusable-release, release-mismatched, or model-mismatched canary
+evidence. LocalLLM's legacy `/healthz` may remain the private transport probe,
+but its HTTP 200 is never application admission. Transport checks should be
+cheap and disclose no model list, filesystem path, build secret, or private
+inventory. Admission documents are authenticated on exposed LazyEdge listeners;
+the worker-local doctor validates their bounded JSON contract without printing
+their bodies.
 
 ## Updating
 

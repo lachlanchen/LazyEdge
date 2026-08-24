@@ -23,7 +23,7 @@ spec:
 
   services:
     - id: local-llm
-      profile: localllm-openai
+      profile: localllm-openai-admission
       domains:
         - llm.example.com
       edge:
@@ -46,3 +46,7 @@ spec:
             methods: [POST]
           - path: /v1/embeddings
             methods: [POST]
+          - path: /readyz
+            methods: [GET]
+          - path: /api/node/capabilities
+            methods: [GET]

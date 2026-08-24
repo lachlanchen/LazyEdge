@@ -44,13 +44,21 @@ The default transport is OpenSSH because it is widely available, inspectable, an
 
 The CLI is the control plane: it validates a declarative `EdgeProject`, computes a plan, renders native configuration, manages capability-token lifecycle, and starts the guards. Version 0.3 leaves remote installation and rollback to the administrator. It is not a hosted coordinator and does not scan networks for services.
 
+The opt-in `localllm-openai-admission` profile adds a bounded application
+predicate, not a fleet control plane. It exposes only authenticated exact
+`GET /readyz` and `GET /api/node/capabilities` claims and lets the worker doctor
+validate catalog readiness plus fresh release-bound canary evidence. LazyEdge
+does not enroll nodes, retain capabilities, choose assignments, count workers,
+or own switch/migration/removal state. A separate coordinator may consume the
+predicate and remains responsible for those decisions and their rollback.
+
 Caddy, the two guards, and the tunnel form the data plane. A request can flow only while all of them are healthy. Keeping these roles separate makes migration possible: create a second edge, connect the same worker, test it, then change DNS.
 
 Runtime bindings preserve the same split. The edge loads only its relay secret and external-client token store; it never opens the private-upstream key. The worker loads only its relay secret and upstream key; it never opens the client token store. Use separate bindings files on the two hosts so an accidental copy does not broaden either host's credential set.
 
 ## Optional loopback compatibility listener
 
-`spec.edge.compatibilityListen` reserves a loopback-only adapter for an existing application on the same cloud host. It is useful when that application should call a selected LazyEdge service without going out through public DNS. The adapter still requires an external Bearer token for every public API route, replaces it with the relay credential, and applies the same exact method/path policy. Its unauthenticated health endpoint is loopback-only and relays only the configured private health check.
+`spec.edge.compatibilityListen` reserves a loopback-only adapter for an existing application on the same cloud host. It is useful when that application should call a selected LazyEdge service without going out through public DNS. The adapter still requires an external Bearer token for every public API route, including the two opt-in admission documents, replaces it with the relay credential, and applies the same exact method/path policy. Its unauthenticated health endpoint is loopback-only, relays only the configured private transport-health check, and is never node admission.
 
 This is not a bypass and must never bind to a public or LAN address. When multiple services exist, the supervising unit selects one explicit service ID for each compatibility listener.
 

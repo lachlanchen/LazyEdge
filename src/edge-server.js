@@ -1,6 +1,9 @@
 import http from "node:http";
 
-import { normalizeManifest } from "./config.js";
+import {
+  LOCALLLM_NODE_ADMISSION_PROFILE,
+  normalizeManifest,
+} from "./config.js";
 import { compileHttpPolicy } from "./http-policy.js";
 import { proxyHttpRequest, sendJsonError } from "./proxy.js";
 import {
@@ -431,7 +434,10 @@ export async function startCompatibilityServer(options = {}) {
   if (service.public.routes.some((route) => route.path === "/healthz")) {
     throw new TypeError("/healthz is reserved for the private compatibility health probe");
   }
-  if (service.public.routes.some((route) => !route.path.startsWith("/v1/"))) {
+  if (
+    service.profile !== LOCALLLM_NODE_ADMISSION_PROFILE
+    && service.public.routes.some((route) => !route.path.startsWith("/v1/"))
+  ) {
     throw new TypeError("Compatibility listeners only support explicit /v1 API routes");
   }
   const publicClaims = new Set();

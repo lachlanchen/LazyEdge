@@ -17,15 +17,25 @@ import {
 export const API_VERSION = "lazyedge.lazying.art/v1alpha1";
 export const MANIFEST_KIND = "EdgeProject";
 export const LOCALLLM_OPENAI_PROFILE = "localllm-openai";
+export const LOCALLLM_NODE_ADMISSION_PROFILE = "localllm-openai-admission";
 
 const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
 const DEFAULT_MAX_CONCURRENT_REQUESTS = 4;
 const DEFAULT_IDLE_TIMEOUT_SECONDS = 900;
-const LOCALLLM_ROUTE_METHODS = new Map([
+const LOCALLLM_OPENAI_ROUTE_METHODS = new Map([
   ["/v1/models", new Set(["GET"])],
   ["/v1/chat/completions", new Set(["POST"])],
   ["/v1/responses", new Set(["POST"])],
   ["/v1/embeddings", new Set(["POST"])],
+]);
+const LOCALLLM_ADMISSION_ROUTE_METHODS = new Map([
+  ...LOCALLLM_OPENAI_ROUTE_METHODS,
+  ["/readyz", new Set(["GET"])],
+  ["/api/node/capabilities", new Set(["GET"])],
+]);
+const LOCALLLM_REQUIRED_ADMISSION_CLAIMS = Object.freeze([
+  "GET\u0000/readyz",
+  "GET\u0000/api/node/capabilities",
 ]);
 
 function isPlainObject(value) {
@@ -152,10 +162,15 @@ function normalizeRoute(route, serviceLabel, profile) {
       code: "DUPLICATE_CLAIM",
     });
   }
-  if (profile === LOCALLLM_OPENAI_PROFILE) {
-    const permitted = LOCALLLM_ROUTE_METHODS.get(path);
+  const profileRoutes = profile === LOCALLLM_OPENAI_PROFILE
+    ? LOCALLLM_OPENAI_ROUTE_METHODS
+    : profile === LOCALLLM_NODE_ADMISSION_PROFILE
+      ? LOCALLLM_ADMISSION_ROUTE_METHODS
+      : undefined;
+  if (profileRoutes !== undefined) {
+    const permitted = profileRoutes.get(path);
     if (!permitted || methods.some((method) => !permitted.has(method))) {
-      throw new SecurityError(`${serviceLabel} route is not allowed by localllm-openai`, {
+      throw new SecurityError(`${serviceLabel} route is not allowed by ${profile}`, {
         code: "PROFILE_POLICY",
       });
     }
@@ -181,7 +196,14 @@ function normalizeService(service, index) {
   const profile = source.profile === undefined
     ? undefined
     : requiredString(source.profile, `${label}.profile`, /^[a-z][a-z0-9-]{0,62}$/u, 63);
-  if (profile !== undefined && !["generic-http", LOCALLLM_OPENAI_PROFILE].includes(profile)) {
+  if (
+    profile !== undefined
+    && ![
+      "generic-http",
+      LOCALLLM_OPENAI_PROFILE,
+      LOCALLLM_NODE_ADMISSION_PROFILE,
+    ].includes(profile)
+  ) {
     throw new SecurityError(`${label}.profile is not supported`, { code: "INVALID_MANIFEST" });
   }
 
@@ -253,6 +275,17 @@ function normalizeService(service, index) {
         });
       }
       localClaims.add(claim);
+    }
+  }
+  if (profile === LOCALLLM_NODE_ADMISSION_PROFILE) {
+    for (const claim of LOCALLLM_REQUIRED_ADMISSION_CLAIMS) {
+      if (!localClaims.has(claim)) {
+        const [method, path] = claim.split("\u0000");
+        throw new SecurityError(
+          `${label} ${profile} requires exact authenticated route ${method} ${path}`,
+          { code: "PROFILE_POLICY" },
+        );
+      }
     }
   }
   routes.sort((left, right) => (

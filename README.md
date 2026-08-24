@@ -33,6 +33,7 @@ flowchart LR
 - **Credential separation:** client, relay, upstream, and SSH credentials are different and stay outside the manifest.
 - **Replaceable transport:** OpenSSH first; the application contract remains decoupled from future WireGuard, rathole, or frp transport.
 - **Private service listeners:** an application-neutral authenticated loopback seam lets edge-local callers reach explicitly selected services without DNS, Caddy, TLS, or NAT exposure.
+- **Bounded node admission:** an opt-in LocalLLM profile authenticates two exact readiness/capability documents and rejects stale or release-mismatched canary evidence without turning LazyEdge into a fleet registry.
 - **Migratable edge:** render the same reviewed project on a second cloud, connect it in parallel, test, then move DNS.
 
 LazyEdge occupies the same problem space as an ngrok-style reverse tunnel, but it is intentionally narrower: the v0.3 preview exposes reviewed HTTP API routes, not arbitrary TCP ports or ad-hoc public URLs. See [concepts at scale](docs/concepts-at-scale.md) for the technology map.
@@ -89,6 +90,7 @@ The `v1alpha1` interface is preview. Version 0.3 does not ship remote `apply`, `
 - [Security and threat model](docs/security.md)
 - [Operations and rollback](docs/operations.md)
 - [Upgrade v0.2 to transport-only v0.3](docs/upgrading-v0.2-to-v0.3.md)
+- [v0.3.1 release notes](docs/releases/v0.3.1.md)
 - [v0.3.0 release notes](docs/releases/v0.3.0.md)
 - [Alibaba → Huawei or dual-edge migration](docs/migration.md)
 - [OpenAI-compatible client integration](docs/integrations/openai-compatible-clients.md)

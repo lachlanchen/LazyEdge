@@ -3,13 +3,23 @@ import http from "node:http";
 import net from "node:net";
 import test from "node:test";
 
-import { API_VERSION, LOCALLLM_OPENAI_PROFILE } from "../src/config.js";
+import {
+  API_VERSION,
+  LOCALLLM_NODE_ADMISSION_PROFILE,
+  LOCALLLM_OPENAI_PROFILE,
+} from "../src/config.js";
 import { startCompatibilityServer, startEdgeServer } from "../src/edge-server.js";
 import { generateCapabilityToken, RELAY_HEADER } from "../src/security.js";
 import { TokenStore } from "../src/token-store.js";
 import { startWorkerServer } from "../src/worker-server.js";
 
-function createManifest({ workerTarget, edgeUpstream, maxBodyBytes = 4096, maxConcurrent = 2 }) {
+function createManifest({
+  workerTarget,
+  edgeUpstream,
+  maxBodyBytes = 4096,
+  maxConcurrent = 2,
+  nodeAdmission = false,
+}) {
   return {
     apiVersion: API_VERSION,
     kind: "EdgeProject",
@@ -26,7 +36,9 @@ function createManifest({ workerTarget, edgeUpstream, maxBodyBytes = 4096, maxCo
       },
       services: [{
         id: "localllm",
-        profile: LOCALLLM_OPENAI_PROFILE,
+        profile: nodeAdmission
+          ? LOCALLLM_NODE_ADMISSION_PROFILE
+          : LOCALLLM_OPENAI_PROFILE,
         domains: ["llm.example.test"],
         edge: { upstream: edgeUpstream },
         worker: {
@@ -41,6 +53,10 @@ function createManifest({ workerTarget, edgeUpstream, maxBodyBytes = 4096, maxCo
             { path: "/v1/chat/completions", methods: ["POST"] },
             { path: "/v1/responses", methods: ["POST"] },
             { path: "/v1/embeddings", methods: ["POST"] },
+            ...(nodeAdmission ? [
+              { path: "/readyz", methods: ["GET"] },
+              { path: "/api/node/capabilities", methods: ["GET"] },
+            ] : []),
           ],
           maxBodyBytes,
           maxConcurrentRequests: maxConcurrent,
@@ -228,6 +244,65 @@ test("edge and worker enforce the LocalLLM allowlist and credential separation",
       headers: { ...externalHeaders(stack.externalToken), host: "llm.example.test.evil.test" },
     });
     assert.equal(wrongHost.status, 404);
+  } finally {
+    await stack.close();
+  }
+});
+
+test("node admission routes require the external capability and preserve credential separation", async () => {
+  const seen = [];
+  const stack = await createStack((incoming, response) => {
+    seen.push({
+      method: incoming.method,
+      url: incoming.url,
+      authorization: incoming.headers.authorization,
+      relay: incoming.headers[RELAY_HEADER],
+    });
+    incoming.resume();
+    response.writeHead(200, {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    });
+    response.end('{"ok":true}');
+  }, { nodeAdmission: true });
+  try {
+    for (const route of ["/readyz", "/api/node/capabilities"]) {
+      const allowed = await request(stack.edge.url, route, {
+        headers: externalHeaders(stack.externalToken),
+      });
+      assert.equal(allowed.status, 200, route);
+
+      const missing = await request(stack.edge.url, route, {
+        headers: { host: "llm.example.test" },
+      });
+      assert.equal(missing.status, 401, route);
+
+      const wrong = await request(stack.edge.url, route, {
+        headers: externalHeaders(generateCapabilityToken("wrong")),
+      });
+      assert.equal(wrong.status, 401, route);
+
+      const wrongMethod = await request(stack.edge.url, route, {
+        method: "POST",
+        headers: externalHeaders(stack.externalToken, { "content-length": "0" }),
+        body: "",
+      });
+      assert.equal(wrongMethod.status, 404, route);
+    }
+
+    for (const deniedRoute of ["/healthz", "/livez", "/api/system/status"]) {
+      const denied = await request(stack.edge.url, deniedRoute, {
+        headers: externalHeaders(stack.externalToken),
+      });
+      assert.equal(denied.status, 404, deniedRoute);
+    }
+
+    assert.deepEqual(seen.map((entry) => [entry.method, entry.url]), [
+      ["GET", "/readyz"],
+      ["GET", "/api/node/capabilities"],
+    ]);
+    assert(seen.every((entry) => entry.authorization === `Bearer ${stack.upstreamToken}`));
+    assert(seen.every((entry) => entry.relay === undefined));
   } finally {
     await stack.close();
   }
@@ -668,13 +743,15 @@ test("compatibility direct API is manifest-authoritative for service and listene
   );
 });
 
-test("loopback compatibility listener ignores Host without weakening route auth", async () => {
+test("loopback compatibility listener keeps transport health separate from admission auth", async () => {
   const paths = [];
   const stack = await createStack((incoming, response) => {
     paths.push(incoming.url);
     incoming.resume();
-    response.end(incoming.url === "/healthz" ? "healthy" : "model-list");
-  });
+    if (incoming.url === "/healthz") response.end("healthy");
+    else if (incoming.url === "/v1/models") response.end("model-list");
+    else response.end("node-document");
+  }, { nodeAdmission: true });
   const reservation = await startHttpServer((_incoming, response) => response.end());
   const compatibilityPort = reservation.server.address().port;
   await reservation.close();
@@ -701,9 +778,22 @@ test("loopback compatibility listener ignores Host without weakening route auth"
     });
     assert.equal(allowed.status, 200);
     assert.equal(allowed.body, "model-list");
+    for (const route of ["/readyz", "/api/node/capabilities"]) {
+      assert.equal((await request(compatibility.url, route)).status, 401, route);
+      const admission = await request(compatibility.url, route, {
+        headers: { authorization: `Bearer ${stack.externalToken}` },
+      });
+      assert.equal(admission.status, 200, route);
+      assert.equal(admission.body, "node-document", route);
+    }
     const management = await request(compatibility.url, "/api");
     assert.equal(management.status, 404);
-    assert.deepEqual(paths, ["/healthz", "/v1/models"]);
+    assert.deepEqual(paths, [
+      "/healthz",
+      "/v1/models",
+      "/readyz",
+      "/api/node/capabilities",
+    ]);
   } finally {
     await compatibility.close();
     await stack.close();

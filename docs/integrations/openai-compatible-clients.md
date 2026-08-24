@@ -16,8 +16,9 @@ flowchart LR
 - LocalLLM listens on workstation loopback, for example `127.0.0.1:8008`.
 - The worker guard targets that exact endpoint; no model-management or debug
   port is routed.
-- The manifest allows only the API paths and methods required by the client,
-  such as `POST /v1/chat/completions` and a deliberately reviewed health path.
+- The manifest allows only the API paths and methods required by the client.
+  Node admission is an explicit profile with two exact authenticated documents;
+  the legacy private health path remains transport-only.
 - The client sends an external LazyEdge token over HTTPS.
 - LazyEdge replaces that token at each boundary; the LocalLLM API key remains
   only on the worker.
@@ -61,7 +62,7 @@ spec:
     sshUser: lazyedge-tunnel
   services:
     - id: localllm
-      profile: localllm-openai
+      profile: localllm-openai-admission
       domains:
         - llm.example.com
       edge:
@@ -69,7 +70,7 @@ spec:
       worker:
         listen: 127.0.0.1:28008
         target: http://127.0.0.1:8008
-        healthPath: /health
+        healthPath: /healthz
       public:
         tokenSet: model-api-users
         maxBodyBytes: 1048576
@@ -77,7 +78,20 @@ spec:
         routes:
           - path: /v1/chat/completions
             methods: [POST]
+          - path: /readyz
+            methods: [GET]
+          - path: /api/node/capabilities
+            methods: [GET]
 ```
+
+Use `localllm-openai` instead if the client needs inference only. The
+`localllm-openai-admission` profile requires both admission routes and guards
+them with the same external LazyEdge token as the declared inference routes.
+An enrolling or switching coordinator must accept the node only when both the
+catalog readiness document and the release-bound functional evidence pass.
+`/healthz` is a private compatibility/transport probe and must never be used to
+admit a node. LazyEdge validates this seam but deliberately keeps no fleet
+registry, desired assignment, or migration state.
 
 Secrets referenced by `tokenSet`, relay authentication, and upstream
 authentication belong in separate owner-readable runtime stores, never in this

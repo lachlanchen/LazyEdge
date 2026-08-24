@@ -95,6 +95,14 @@ test("Caddy renders an exact-root landing page only for LocalLLM API hosts", () 
   const generic = structuredClone(fixture);
   generic.spec.services[0].profile = "generic-http";
   assert.doesNotMatch(renderCaddy(generic), /@lazyedge_landing/u);
+
+  const admission = structuredClone(fixture);
+  admission.spec.services[0].profile = "localllm-openai-admission";
+  admission.spec.services[0].public.routes.push(
+    { path: "/readyz", methods: ["GET"] },
+    { path: "/api/node/capabilities", methods: ["GET"] },
+  );
+  assert.match(renderCaddy(admission), /@lazyedge_landing/u);
 });
 
 test("Caddy renderer refuses privileged ports and unsafe certificate paths", () => {

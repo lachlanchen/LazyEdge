@@ -61,7 +61,9 @@ test("init, validate, and plan form a safe first-run path", async () => {
   const planned = await invoke(["plan", "--config", manifestPath]);
   assert.equal(planned.code, 0, planned.stderr);
   assert.match(planned.stdout, /GET \/v1\/models/u);
-  assert.doesNotMatch(planned.stdout, /\/api/u);
+  assert.match(planned.stdout, /GET \/readyz/u);
+  assert.match(planned.stdout, /GET \/api\/node\/capabilities/u);
+  assert.doesNotMatch(planned.stdout, /\/api\/(?:admin|system)|\/livez|\/healthz/u);
 });
 
 test("render commands require explicit deployment inputs and emit usable artifacts", async () => {
@@ -171,6 +173,9 @@ test("doctor exposes split edge and worker roles", async () => {
   const report = JSON.parse(result.stdout);
   assert.equal(report.role, "worker");
   assert(report.checks.every((entry) => !entry.id.startsWith("edge-")));
+  assert.equal(report.boundaries.transport.checked, 2);
+  assert.equal(report.boundaries.applicationAdmission.checked, 1);
+  assert.equal(report.boundaries.operations.checked, 0);
 });
 
 test("edge service selection cannot imply undeclared gateway isolation", async () => {

@@ -41,6 +41,7 @@ LazyEdge cannot contain a fully compromised gateway, worker, root account, SSH k
 | Tunnel command injection | manifest values become validated argument arrays, never shell fragments |
 | Resource exhaustion | per-service body and concurrency limits; provider/firewall rate controls remain advisable |
 | Stale authorization | named token sets support issue/list/revoke and deliberate rotation |
+| Legacy or stale node admitted | opt-in LocalLLM admission profile requires authenticated exact documents, immutable matching release IDs, fresh passing canary evidence, and matching model provenance; `/healthz` is transport-only |
 | Silent config drift | validate, plan, render, manifest digest, health probe, and exact rollback target |
 
 Bearer tokens grant access to whoever possesses them. Send them only over TLS, never in URLs, and store them as secrets. These rules follow the security considerations in [RFC 6750](https://www.rfc-editor.org/rfc/rfc6750).

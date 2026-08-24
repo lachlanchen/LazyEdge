@@ -2,7 +2,11 @@ import { spawn } from "node:child_process";
 import { readFile, stat } from "node:fs/promises";
 import net from "node:net";
 
-import { normalizeManifest } from "./config.js";
+import {
+  LOCALLLM_NODE_ADMISSION_PROFILE,
+  normalizeManifest,
+} from "./config.js";
+import { probeLocalLlmAdmission } from "./node-admission.js";
 import { openSshForwards } from "./openssh.js";
 import { normalizeLoopbackListener, SecurityError } from "./security.js";
 
@@ -10,6 +14,14 @@ const ROLES = new Set(["edge", "worker", "all"]);
 
 function check(id, kind, details) {
   return Object.freeze({ id, kind, ...details });
+}
+
+function boundarySummary(results, boundary) {
+  const selected = results.filter((result) => result.boundary === boundary);
+  return Object.freeze({
+    checked: selected.length,
+    ok: selected.length === 0 ? null : selected.every((result) => result.status === "pass"),
+  });
 }
 
 function listenerFromUrl(value) {
@@ -25,46 +37,55 @@ export function planDoctorChecks(input, {
   if (!ROLES.has(role)) throw new SecurityError("Doctor role must be edge, worker, or all");
   const checks = [];
   checks.push(check("manifest-policy", "policy", {
+    boundary: "policy",
     description: "Manifest passed default-deny validation",
   }));
 
   if (role === "edge" || role === "all") {
     checks.push(check("edge-gateway-listener", "tcp", {
+      boundary: "transport",
       listener: manifest.spec.edge.gatewayListen,
       description: "Authenticated edge gateway accepts loopback traffic",
     }));
     for (const service of manifest.spec.services) {
       checks.push(check(`edge-tunnel-${service.id}`, "tcp", {
+        boundary: "transport",
         listener: listenerFromUrl(service.edge.upstream),
         description: `Reverse tunnel listener for ${service.id} is connected`,
       }));
     }
     for (const privateListener of manifest.spec.edge.privateListeners ?? []) {
       checks.push(check(`edge-private-listener-${privateListener.service}`, "tcp", {
+        boundary: "transport",
         listener: privateListener.listen,
         description: `Authenticated private listener for ${privateListener.service} is accepting loopback traffic`,
       }));
     }
     if (paths.edgeManifest) checks.push(check("edge-manifest-mode", "file-mode", {
+      boundary: "operations",
       path: paths.edgeManifest,
       allowedModes: [0o600, 0o640],
     }));
     if (paths.edgeBindings) checks.push(check("edge-bindings-mode", "file-mode", {
+      boundary: "operations",
       path: paths.edgeBindings,
       allowedModes: [0o600, 0o640],
     }));
     if (paths.caddyConfig) {
       checks.push(check("caddy-config-mode", "file-mode", {
+        boundary: "operations",
         path: paths.caddyConfig,
         allowedModes: [0o600, 0o640, 0o644],
       }));
       checks.push(check("caddy-config-policy", "caddy-policy", {
+        boundary: "operations",
         path: paths.caddyConfig,
         httpPort: manifest.spec.edge.httpPort,
         httpsPort: manifest.spec.edge.httpsPort,
         gatewayListen: manifest.spec.edge.gatewayListen,
       }));
       checks.push(check("caddy-validate", "command", {
+        boundary: "operations",
         file: paths.caddyExecutable ?? "/usr/bin/caddy",
         args: ["validate", "--config", paths.caddyConfig, "--adapter", "caddyfile"],
       }));
@@ -74,48 +95,66 @@ export function planDoctorChecks(input, {
   if (role === "worker" || role === "all") {
     for (const service of manifest.spec.services) {
       checks.push(check(`worker-guard-${service.id}`, "tcp", {
+        boundary: "transport",
         listener: service.worker.listen,
         description: `Default-deny worker guard for ${service.id} is listening`,
       }));
       if (service.worker.healthPath !== undefined) {
         checks.push(check(`worker-target-${service.id}`, "http", {
+          boundary: "transport",
           url: new URL(service.worker.healthPath, service.worker.target).href,
-          description: `Private upstream health for ${service.id} succeeds`,
+          description: `Private upstream transport health for ${service.id} succeeds`,
+        }));
+      }
+      if (service.profile === LOCALLLM_NODE_ADMISSION_PROFILE) {
+        checks.push(check(`worker-application-admission-${service.id}`, "localllm-admission", {
+          boundary: "application-admission",
+          readyUrl: new URL("/readyz", service.worker.target).href,
+          capabilitiesUrl: new URL("/api/node/capabilities", service.worker.target).href,
+          description: `Release-bound LocalLLM application admission for ${service.id} passes`,
         }));
       }
     }
     if (paths.workerManifest) checks.push(check("worker-manifest-mode", "file-mode", {
+      boundary: "operations",
       path: paths.workerManifest,
       allowedModes: [0o600],
     }));
     if (paths.workerBindings) checks.push(check("worker-bindings-mode", "file-mode", {
+      boundary: "operations",
       path: paths.workerBindings,
       allowedModes: [0o600],
     }));
     if (paths.sshConfig) {
       checks.push(check("ssh-config-mode", "file-mode", {
+        boundary: "operations",
         path: paths.sshConfig,
         allowedModes: [0o600],
       }));
       checks.push(check("ssh-config-policy", "ssh-policy", {
+        boundary: "operations",
         path: paths.sshConfig,
         forwards: openSshForwards(manifest),
       }));
       checks.push(check("ssh-config-parse", "command", {
+        boundary: "operations",
         file: paths.sshExecutable ?? "/usr/bin/ssh",
         args: ["-G", "-F", paths.sshConfig, paths.sshAlias ?? "lazyedge-edge"],
       }));
     }
     if (paths.sshPrivateKey) checks.push(check("ssh-private-key-mode", "file-mode", {
+      boundary: "operations",
       path: paths.sshPrivateKey,
       allowedModes: [0o600],
     }));
     if (paths.knownHosts) {
       checks.push(check("known-hosts-mode", "file-mode", {
+        boundary: "operations",
         path: paths.knownHosts,
         allowedModes: [0o600, 0o644],
       }));
       checks.push(check("known-hosts-pin", "known-hosts", {
+        boundary: "operations",
         path: paths.knownHosts,
         host: manifest.spec.transport.sshHost,
         hostKeyAlias: manifest.spec.transport.hostKeyAlias,
@@ -267,8 +306,19 @@ export async function runDoctor(input, {
           redirect: "error",
           signal: AbortSignal.timeout(timeoutMs),
         });
-        if (!response.ok) throw new Error(`health endpoint returned HTTP ${response.status}`);
+        if (!response.ok) {
+          await response.body?.cancel?.().catch(() => {});
+          throw new Error(`health endpoint returned HTTP ${response.status}`);
+        }
         await response.body?.cancel();
+      }
+      if (item.kind === "localllm-admission") {
+        await probeLocalLlmAdmission({
+          readyUrl: item.readyUrl,
+          capabilitiesUrl: item.capabilitiesUrl,
+          fetchImpl,
+          timeoutMs,
+        });
       }
       if (item.kind === "file-mode") await fileModeProbe(item, statImpl);
       if (item.kind === "ssh-policy") await sshPolicyProbe(item, readFileImpl);
@@ -277,19 +327,31 @@ export async function runDoctor(input, {
       if (item.kind === "command") {
         await commandProbeImpl(item.file, [...item.args], timeoutMs);
       }
-      results.push(Object.freeze({ id: item.id, status: "pass", description: item.description }));
+      results.push(Object.freeze({
+        id: item.id,
+        boundary: item.boundary,
+        status: "pass",
+        description: item.description,
+      }));
     } catch (error) {
       results.push(Object.freeze({
         id: item.id,
+        boundary: item.boundary,
         status: "fail",
         description: item.description,
         message: safeMessage(error),
       }));
     }
   }
+  const frozenResults = Object.freeze(results);
   return Object.freeze({
     ok: results.every((result) => result.status === "pass"),
     role,
-    checks: Object.freeze(results),
+    boundaries: Object.freeze({
+      transport: boundarySummary(results, "transport"),
+      applicationAdmission: boundarySummary(results, "application-admission"),
+      operations: boundarySummary(results, "operations"),
+    }),
+    checks: frozenResults,
   });
 }
