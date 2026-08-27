@@ -197,6 +197,9 @@ Confirm:
 - Caddy contains only intended domains and loopback upstreams;
 - `ssh -R` uses an explicit `127.0.0.1:PORT:127.0.0.1:PORT` mapping;
 - the account bootstrap authorizes only the supplied public key and exact `permitlisten` ports;
+- the dedicated tunnel user's edge-side `ClientAliveInterval 15` and
+  `ClientAliveCountMax 3` policy is present, while unrelated SSH users retain
+  the administrator's global policy;
 - SSH host-key checking remains enabled;
 - service units reference external credential files and no command-line secrets;
 - existing Caddy sites are preserved;

@@ -52,6 +52,15 @@ Use a dedicated unprivileged account and a dedicated key for each worker-to-edge
 
 On the client, `ExitOnForwardFailure`, keepalives, and explicit host-key checking help a supervisor distinguish a live tunnel from a failed setup; see [`ssh_config(5)`](https://man.openbsd.org/ssh_config.5). Never weaken host-key verification to make automation convenient.
 
+The generated edge-side `Match User` policy also sets `ClientAliveInterval 15`
+and `ClientAliveCountMax 3` for only the dedicated tunnel identity. These
+encrypted protocol probes let `sshd` close a worker session that became
+unreachable without completing TCP shutdown, releasing its loopback reverse
+listeners after roughly 45 seconds of unanswered probes. Keep both sides:
+worker-side `ServerAlive*` detects a dead edge, while edge-side `ClientAlive*`
+detects a dead worker. Do not apply this policy globally to unrelated SSH
+users.
+
 The account renderer accepts a dedicated **public** key from a file; never give it a private-key path or paste key material into an argument. The OpenSSH renderer records the worker's private-key and pinned-known-hosts **paths**, not their contents. Keep the private key only on the worker with restrictive permissions, and verify the edge host key out of band before writing `known_hosts`.
 
 ## TLS and edge authentication

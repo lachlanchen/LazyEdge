@@ -4,6 +4,8 @@ Match User {{TUNNEL_USER}}
     PubkeyAuthentication yes
     PasswordAuthentication no
     KbdInteractiveAuthentication no
+    ClientAliveInterval 15
+    ClientAliveCountMax 3
     AllowTcpForwarding remote
     AllowStreamLocalForwarding no
     GatewayPorts no

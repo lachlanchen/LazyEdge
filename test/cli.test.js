@@ -86,6 +86,8 @@ test("render commands require explicit deployment inputs and emit usable artifac
   ]);
   assert.equal(accounts.code, 0, accounts.stderr);
   assert.match(accounts.stdout, /PasswordAuthentication no/u);
+  assert.match(accounts.stdout, /ClientAliveInterval 15/u);
+  assert.match(accounts.stdout, /ClientAliveCountMax 3/u);
   assert.match(accounts.stdout, /permitlisten="127\.0\.0\.1:18008"/u);
 
   await chmod(publicKeyPath, 0o666);

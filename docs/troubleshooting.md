@@ -25,7 +25,7 @@ Do not disable certificate validation. A resolver override is safer for pre-cuto
 
 ## Tunnel
 
-On the edge, inspect the expected listener. It must be on `127.0.0.1`, not a wildcard address. On the worker, inspect the supervised SSH process and its recent logs. `ExitOnForwardFailure` catches initial bind failures; `ServerAliveInterval` and `ServerAliveCountMax` help detect a dead connection. See [`ssh_config(5)`](https://man.openbsd.org/ssh_config.5).
+On the edge, inspect the expected listener. It must be on `127.0.0.1`, not a wildcard address. On the worker, inspect the supervised SSH process and its recent logs. `ExitOnForwardFailure` catches initial bind failures; worker-side `ServerAliveInterval`/`ServerAliveCountMax` detect a dead edge, and the generated edge-side `ClientAliveInterval`/`ClientAliveCountMax` policy detects a dead worker and releases its reverse listeners. See [`ssh_config(5)`](https://man.openbsd.org/ssh_config.5) and [`sshd_config(5)`](https://man.openbsd.org/sshd_config).
 
 Common causes are a port already in use, an unauthorized key, a changed host key, `AllowTcpForwarding`/`PermitListen` restrictions, DNS failure, or a supervisor repeatedly starting duplicate tunnels. Do not set `StrictHostKeyChecking=no` as a repair.
 
@@ -33,7 +33,11 @@ The rendered user tunnel retries indefinitely with a 15-second delay. If an
 older unit exhausted systemd's start limit during a long outage, first prove
 that no duplicate SSH process or remote listener exists, then use the user
 manager's `reset-failed` and `start` actions for that exact LazyEdge unit. Do
-not treat repeated bind failure as permission to kill an unknown listener.
+not treat repeated bind failure as permission to kill an unknown listener. A
+gateway rendered with the current account policy should remove an unreachable
+tunnel user's orphaned listener after roughly 45 seconds; if the listener
+persists longer, verify the effective per-user `sshd` configuration before any
+targeted recovery.
 
 ## Guards and credentials
 

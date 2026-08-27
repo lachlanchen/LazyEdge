@@ -82,6 +82,11 @@ export function renderTunnelSshdConfig(input, {
     "    PubkeyAuthentication yes",
     "    PasswordAuthentication no",
     "    KbdInteractiveAuthentication no",
+    // Bound stale edge-side sessions even when a dead worker can no longer
+    // deliver its own ServerAlive probes. This applies only to the dedicated
+    // tunnel identity because it lives inside the Match block.
+    "    ClientAliveInterval 15",
+    "    ClientAliveCountMax 3",
     "    AllowTcpForwarding remote",
     "    AllowStreamLocalForwarding no",
     "    GatewayPorts no",

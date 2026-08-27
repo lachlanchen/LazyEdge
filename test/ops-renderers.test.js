@@ -376,6 +376,8 @@ test("dedicated tunnel identity permits only exact remote listeners", () => {
     "AuthenticationMethods publickey",
     "PasswordAuthentication no",
     "KbdInteractiveAuthentication no",
+    "ClientAliveInterval 15",
+    "ClientAliveCountMax 3",
     "AllowTcpForwarding remote",
     "GatewayPorts no",
     "PermitListen 127.0.0.1:18008",
@@ -418,10 +420,27 @@ test("rendered sshd include restores global parsing after its Match block", asyn
     await writeFile(configPath, [
       `HostKey ${keyPath}`,
       `Include ${includePath}`,
+      "ClientAliveInterval 0",
+      "ClientAliveCountMax 9",
       "UsePAM yes",
       "",
     ].join("\n"), { mode: 0o600 });
     await execFile("/usr/sbin/sshd", ["-T", "-f", configPath]);
+    const { stdout: tunnelConfig } = await execFile("/usr/sbin/sshd", [
+      "-T",
+      "-f", configPath,
+      "-C", "user=lazyedge-tunnel,host=edge.example.net,addr=192.0.2.10",
+    ]);
+    assert.match(tunnelConfig, /^clientaliveinterval 15$/mu);
+    assert.match(tunnelConfig, /^clientalivecountmax 3$/mu);
+
+    const { stdout: otherUserConfig } = await execFile("/usr/sbin/sshd", [
+      "-T",
+      "-f", configPath,
+      "-C", "user=unrelated,host=edge.example.net,addr=192.0.2.10",
+    ]);
+    assert.match(otherUserConfig, /^clientaliveinterval 0$/mu);
+    assert.match(otherUserConfig, /^clientalivecountmax 9$/mu);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
