@@ -34,9 +34,10 @@ flowchart LR
 - **Replaceable transport:** OpenSSH first; the application contract remains decoupled from future WireGuard, rathole, or frp transport.
 - **Private service listeners:** an application-neutral authenticated loopback seam lets edge-local callers reach explicitly selected services without DNS, Caddy, TLS, or NAT exposure.
 - **Bounded node admission:** an opt-in LocalLLM profile authenticates two exact readiness/capability documents and rejects stale or release-mismatched canary evidence without turning LazyEdge into a fleet registry.
+- **Read-only rollout safety:** a separate generic contract, journal, and one-shot stop authority can be embedded by an application-owned controller without giving the LazyEdge CLI deployment powers.
 - **Migratable edge:** render the same reviewed project on a second cloud, connect it in parallel, test, then move DNS.
 
-LazyEdge occupies the same problem space as an ngrok-style reverse tunnel, but it is intentionally narrower: the v0.3 preview exposes reviewed HTTP API routes, not arbitrary TCP ports or ad-hoc public URLs. See [concepts at scale](docs/concepts-at-scale.md) for the technology map.
+LazyEdge occupies the same problem space as an ngrok-style reverse tunnel, but it is intentionally narrower: the v0.4 preview exposes reviewed HTTP API routes, not arbitrary TCP ports or ad-hoc public URLs. See [concepts at scale](docs/concepts-at-scale.md) for the technology map.
 
 ## Quickstart
 
@@ -69,14 +70,39 @@ Keep runtime bindings split by trust boundary: copy the [edge example](examples/
 
 After startup, run `doctor --role edge` on the cloud and `doctor --role worker` on private compute; use `all` only when both roles are genuinely co-located. Root-only `render redirect-helper` and `render nat --direction apply|rollback` commands print review artifacts with manifest-digest ownership tags—they never execute a firewall change. See [operations](docs/operations.md).
 
-The `v1alpha1` interface is preview. Version 0.3 does not ship remote `apply`, `rollback`, or `uninstall`: renderers write reviewable artifacts, and an administrator installs them deliberately. See the complete [quickstart](docs/quickstart.md).
+The `v1alpha1` interface is preview. Version 0.4 does not ship remote `apply`, `rollback`, or `uninstall`: renderers write reviewable artifacts, and an administrator installs them deliberately. See the complete [quickstart](docs/quickstart.md).
+
+## Read-only rollout safety preview
+
+An application-owned deployment controller can use the packaged `EdgeRollout`
+contract, durable journal, and one-shot stop authority without moving its probes,
+drain policy, service discovery, artifact installation, or rollback logic into
+LazyEdge. The CLI surface is deliberately observational:
+
+```bash
+lazyedge rollout validate --rollout ./edge-rollout.yaml
+lazyedge rollout plan --rollout ./edge-rollout.yaml --json
+lazyedge rollout inspect --state /absolute/private/path/phase.json --json
+```
+
+Rollout input must be a non-empty regular UTF-8 YAML or JSON file no larger than
+1 MiB. Symlinks, duplicate keys, YAML merges, aliases, custom tags, parser warnings,
+unknown fields, and oversized input are rejected. `validate` and `plan` normalize
+the declared artifact claims and compute a deterministic digest; they do not read
+or verify the artifact paths and grant no write or stop authority. `inspect` reads
+an existing owner-private journal without acquiring a lease.
+
+There is no rollout executor, live-artifact verifier, or rollout systemd renderer.
+A controller consuming a one-shot stop authorization must immediately couple the
+exact PID and Linux process start ticks to the claimed systemd `InvocationID`
+before performing the stop. See [rollout safety and ownership](docs/rollout-safety.md).
 
 ## What is included
 
 | Path | Contents |
 | --- | --- |
 | [`bin/`](bin/) and [`src/`](src/) | CLI, manifest validation, guards, token lifecycle, and renderers |
-| [`schemas/`](schemas/) | machine-readable `EdgeProject` contract |
+| [`schemas/`](schemas/) | machine-readable `EdgeProject` and read-only `EdgeRollout` contracts |
 | [`templates/`](templates/) | generated Caddy, OpenSSH, and systemd building blocks |
 | [`examples/`](examples/) | secret-free LocalLLM and generic HTTP examples, including separate [edge](examples/local-llm/bindings.edge.example.yaml) and [worker](examples/local-llm/bindings.worker.example.yaml) bindings |
 | [`docs/`](docs/) | architecture, security, operations, migration, and teaching guides |
@@ -90,11 +116,13 @@ The `v1alpha1` interface is preview. Version 0.3 does not ship remote `apply`, `
 - [Security and threat model](docs/security.md)
 - [Operations and rollback](docs/operations.md)
 - [Upgrade v0.2 to transport-only v0.3](docs/upgrading-v0.2-to-v0.3.md)
+- [v0.4.0 release notes](docs/releases/v0.4.0.md)
 - [v0.3.1 release notes](docs/releases/v0.3.1.md)
 - [v0.3.0 release notes](docs/releases/v0.3.0.md)
 - [Alibaba → Huawei or dual-edge migration](docs/migration.md)
 - [OpenAI-compatible client integration](docs/integrations/openai-compatible-clients.md)
 - [Application-neutral private service listeners](docs/private-service-listeners.md)
+- [Rollout safety and controller ownership](docs/rollout-safety.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [How larger multi-server systems relate](docs/concepts-at-scale.md)
 
@@ -125,6 +153,6 @@ If you use LazyEdge in research, cite the repository. GitHub reads [CITATION.cff
 
 ## Status
 
-**v0.3 preview.** The public interface may change. This repository describes the intended safe baseline; it does not claim that any particular domain, cloud server, tunnel, npm version, or LocalLLM deployment is live until that environment is independently verified. Do not use LazyEdge as the only control protecting sensitive or safety-critical systems.
+**v0.4 preview.** The public interface may change. This repository describes the intended safe baseline; it does not claim that any particular domain, cloud server, tunnel, npm version, or LocalLLM deployment is live until that environment is independently verified. Do not use LazyEdge as the only control protecting sensitive or safety-critical systems.
 
 MIT © [Lachlan Chen](https://github.com/lachlanchen)

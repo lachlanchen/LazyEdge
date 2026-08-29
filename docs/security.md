@@ -43,8 +43,15 @@ LazyEdge cannot contain a fully compromised gateway, worker, root account, SSH k
 | Stale authorization | named token sets support issue/list/revoke and deliberate rotation |
 | Legacy or stale node admitted | opt-in LocalLLM admission profile requires authenticated exact documents, immutable matching release IDs, fresh passing canary evidence, and matching model provenance; `/healthz` is transport-only |
 | Silent config drift | validate, plan, render, manifest digest, health probe, and exact rollback target |
+| Rollout summary mistaken for authority | rollout validate/plan never inspect live artifacts or mutate state; stop permission is a separate one-shot authority that the application controller must immediately couple to PID, process start ticks, and systemd `InvocationID` |
 
 Bearer tokens grant access to whoever possesses them. Send them only over TLS, never in URLs, and store them as secrets. These rules follow the security considerations in [RFC 6750](https://www.rfc-editor.org/rfc/rfc6750).
+
+The rollout stores use exact effective UID/GID ownership and owner-private modes
+as a local trust boundary; they are not a distributed signature system. A plan
+digest identifies normalized declared intent, not installed bytes or permission
+to write. Read the complete [rollout ownership boundary](rollout-safety.md)
+before embedding these libraries in a controller.
 
 ## SSH hardening
 

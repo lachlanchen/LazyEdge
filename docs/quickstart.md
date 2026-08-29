@@ -22,7 +22,7 @@ cd my-edge
 npx @lazyingart/lazyedge init --output lazyedge.yaml
 ```
 
-`init` creates one secret-free `lazyedge.yaml`. Open the manifest and replace example hosts and ports. The v0.3 preview requires exact IPv4 loopback listeners such as `127.0.0.1:18008`; never use `0.0.0.0`, `::1`, a LAN address, or a raw public target.
+`init` creates one secret-free `lazyedge.yaml`. Open the manifest and replace example hosts and ports. The v0.4 preview requires exact IPv4 loopback listeners such as `127.0.0.1:18008`; never use `0.0.0.0`, `::1`, a LAN address, or a raw public target.
 
 For an inference-only LocalLLM/OpenAI-compatible service, use
 `profile: localllm-openai`. To let an authenticated coordinator make a

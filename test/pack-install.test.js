@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { lstat, mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -46,6 +46,22 @@ test(
       directory,
     ]));
     assert.equal(packed.length, 1);
+    const rolloutPackagePaths = [
+      "docs/rollout-safety.md",
+      "src/rollout-authority.js",
+      "src/rollout-cli.js",
+      "src/rollout-contract.js",
+      "src/rollout-journal.js",
+      "schemas/edge-rollout.schema.json",
+      "test/rollout-authority.test.js",
+      "test/rollout-cli.test.js",
+      "test/rollout-contract.test.js",
+      "test/rollout-journal.test.js",
+    ];
+    for (const relativePath of rolloutPackagePaths) {
+      const entry = packed[0].files.find((file) => file.path === relativePath);
+      assert.equal(entry?.mode, 0o644, relativePath);
+    }
     const tarball = path.join(directory, packed[0].filename);
     const prefix = path.join(directory, "prefix");
     run("npm", [
@@ -66,6 +82,24 @@ test(
       "@lazyingart",
       "lazyedge",
     );
+    for (const relativePath of rolloutPackagePaths) {
+      const info = await lstat(path.join(installedRoot, relativePath));
+      assert.equal(info.mode & 0o400, 0o400, relativePath);
+    }
+    assert.equal(run(process.execPath, [
+      "--input-type=module",
+      "--eval",
+      `
+        const authority = await import("@lazyingart/lazyedge/rollout/authority");
+        const contract = await import("@lazyingart/lazyedge/rollout/contract");
+        const journal = await import("@lazyingart/lazyedge/rollout/journal");
+        if (typeof authority.consumeStopPermit !== "function") process.exit(1);
+        if (typeof contract.normalizeEdgeRollout !== "function") process.exit(1);
+        if (typeof journal.inspectRolloutJournal !== "function") process.exit(1);
+        import.meta.resolve("@lazyingart/lazyedge/schemas/edge-rollout.schema.json");
+        process.stdout.write("rollout-exports-ok");
+      `,
+    ], { cwd: installedRoot }), "rollout-exports-ok");
     run("npm", ["run", "check", "--silent"], { cwd: installedRoot });
     run("npm", ["run", "pack:dry-run", "--silent"], { cwd: installedRoot });
     run("npm", ["test", "--silent"], {

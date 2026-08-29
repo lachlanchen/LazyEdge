@@ -2,7 +2,7 @@
 
 ## Status
 
-This page documents the transport-only v0.3 contract. It is not part of the
+This page documents the transport-only v0.4 contract. It is not part of the
 published v0.2.0 package. Source metadata, a Git tag, package publication and
 deployment are separate checkpoints; none may be cited as production
 acceptance without verification of the exact artifact in that environment.

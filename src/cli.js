@@ -9,6 +9,11 @@ import {
   startPrivateServiceServer,
 } from "./edge-server.js";
 import { loadBindings, readPrivateText } from "./runtime-config.js";
+import {
+  loadEdgeRolloutDocument,
+  summarizeEdgeRollout,
+} from "./rollout-cli.js";
+import { inspectRolloutJournal } from "./rollout-journal.js";
 import { generateCapabilityToken } from "./security.js";
 import { normalizeTokenScope, TokenStore } from "./token-store.js";
 import { startWorkerServer } from "./worker-server.js";
@@ -24,6 +29,9 @@ Usage:
   lazyedge init [--output lazyedge.yaml]
   lazyedge validate [--config lazyedge.yaml] [--json]
   lazyedge plan [--config lazyedge.yaml] [--json]
+  lazyedge rollout validate --rollout FILE [--json]
+  lazyedge rollout plan --rollout FILE [--json]
+  lazyedge rollout inspect --state FILE [--plan-digest SHA256] [--operation-id ID] [--json]
   lazyedge render caddy [--config lazyedge.yaml] [--manual-certificates]
   lazyedge render openssh [--config lazyedge.yaml] [--identity-file FILE] [--known-hosts-file FILE]
   lazyedge render accounts [--config lazyedge.yaml] --public-key-file FILE
@@ -46,7 +54,8 @@ Usage:
 
 Security:
   Secrets are read from owner-protected files. They are never accepted as CLI
-  arguments. Public routes are exact and default deny.
+  arguments. Public routes are exact and default deny. Rollout commands are
+  read-only summaries and inspection; they grant no write or stop authority.
 `;
 
 function parseOptions(argv) {
@@ -193,6 +202,81 @@ async function planCommand(options, stdout) {
       for (const route of service.routes) output(stdout, `  ${route.methods.join(",")} ${route.path}`);
     }
   }
+}
+
+async function rolloutCommand(action, options, stdout) {
+  if (!new Set(["validate", "plan", "inspect"]).has(action)) {
+    throw new Error("rollout requires validate, plan, or inspect");
+  }
+  if (action === "validate" || action === "plan") {
+    assertOptions(options, ["rollout", "json"]);
+    const requestedPath = stringOption(options, "rollout");
+    if (requestedPath === undefined) {
+      throw new Error(`rollout ${action} requires --rollout FILE`);
+    }
+    const json = flag(options, "json");
+    const file = path.resolve(requestedPath);
+    const summary = summarizeEdgeRollout(await loadEdgeRolloutDocument(file));
+    if (action === "validate") {
+      const result = {
+        valid: true,
+        summaryOnly: true,
+        file,
+        name: summary.name,
+        deploymentId: summary.deploymentId,
+        edgeProjectDigest: summary.edgeProjectDigest,
+        planDigest: summary.planDigest,
+        artifactCount: summary.artifactCount,
+      };
+      output(stdout, json ? result : `valid ${result.planDigest}`, json);
+      return;
+    }
+    const result = { file, ...summary };
+    if (json) {
+      output(stdout, result, true);
+      return;
+    }
+    output(stdout, "Read-only rollout plan summary (not execution authority)");
+    output(stdout, `Rollout: ${result.name}`);
+    output(stdout, `Deployment ID: ${result.deploymentId}`);
+    output(stdout, `EdgeProject digest: ${result.edgeProjectDigest}`);
+    output(stdout, `Plan digest: ${result.planDigest}`);
+    output(stdout, `Artifacts: ${result.artifactCount}`);
+    for (const artifact of result.artifacts) {
+      output(
+        stdout,
+        `  ${artifact.id} ${artifact.sha256} ${artifact.owner}:${artifact.group} ${artifact.mode} ${artifact.type} ${artifact.path}`,
+      );
+    }
+    return;
+  }
+
+  assertOptions(options, ["state", "plan-digest", "operation-id", "json"]);
+  const requestedState = stringOption(options, "state");
+  if (requestedState === undefined) {
+    throw new Error("rollout inspect requires --state FILE");
+  }
+  const json = flag(options, "json");
+  const statePath = path.resolve(requestedState);
+  const expectedPlanDigest = stringOption(options, "plan-digest");
+  const expectedOperationId = stringOption(options, "operation-id");
+  const state = await inspectRolloutJournal({
+    statePath,
+    ...(expectedPlanDigest === undefined ? {} : { planDigest: expectedPlanDigest }),
+    ...(expectedOperationId === undefined ? {} : { operationId: expectedOperationId }),
+  });
+  if (json) {
+    output(stdout, state, true);
+    return;
+  }
+  output(stdout, "Read-only rollout journal inspection");
+  output(stdout, `Operation ID: ${state.operationId}`);
+  output(stdout, `Plan digest: ${state.planDigest}`);
+  output(stdout, `Activation phase: ${state.activationPhase}`);
+  output(stdout, `Rollback phase: ${state.rollbackPhase ?? "none"}`);
+  output(stdout, `Sequence: ${state.sequence}`);
+  output(stdout, `Updated: ${state.updatedAt}`);
+  output(stdout, `Terminal outcome: ${state.terminalReceipt?.outcome ?? "none"}`);
 }
 
 async function renderCommand(kind, options, stdout) {
@@ -762,6 +846,7 @@ export async function runCli(argv, { stdout, stderr } = {}) {
       || command === "token"
       || command === "secret"
       || command === "serve"
+      || command === "rollout"
     ) {
       const action = argv[1];
       const { options, positionals } = parseOptions(argv.slice(2));
@@ -770,6 +855,7 @@ export async function runCli(argv, { stdout, stderr } = {}) {
       if (command === "token") await tokenCommand(action, options, out);
       if (command === "secret") await secretCommand(action, options, out);
       if (command === "serve") await serveCommand(action, options, out);
+      if (command === "rollout") await rolloutCommand(action, options, out);
       return 0;
     }
     const { options, positionals } = parseOptions(argv.slice(1));

@@ -25,7 +25,7 @@ flowchart LR
 6. The worker guard validates and removes the relay credential, repeats the route checks, and injects the private service's distinct Bearer credential.
 7. The local service answers. Its port never becomes a public listener.
 
-Caddy itself supports streaming responses and WebSocket upgrades, but the v0.3 preview intentionally strips `Upgrade` and implements HTTP/SSE only. End-to-end WebSocket forwarding is not part of the current contract. LazyEdge applies the declared route and resource limits before HTTP traffic reaches a worker. See the [Caddy reverse proxy documentation](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy).
+Caddy itself supports streaming responses and WebSocket upgrades, but the v0.4 preview intentionally strips `Upgrade` and implements HTTP/SSE only. End-to-end WebSocket forwarding is not part of the current contract. LazyEdge applies the declared route and resource limits before HTTP traffic reaches a worker. See the [Caddy reverse proxy documentation](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy).
 
 ## Components and trust zones
 
@@ -42,7 +42,15 @@ The default transport is OpenSSH because it is widely available, inspectable, an
 
 ## Control plane and data plane
 
-The CLI is the control plane: it validates a declarative `EdgeProject`, computes a plan, renders native configuration, manages capability-token lifecycle, and starts the guards. Version 0.3 leaves remote installation and rollback to the administrator. It is not a hosted coordinator and does not scan networks for services.
+The CLI is the control plane: it validates a declarative `EdgeProject`, computes a plan, renders native configuration, manages capability-token lifecycle, and starts the guards. Version 0.4 leaves remote installation and rollback to the administrator. It is not a hosted coordinator and does not scan networks for services.
+
+The separate rollout safety libraries are controller-building primitives, not an
+expansion of that control plane. Their CLI commands only normalize and digest an
+`EdgeRollout` or inspect an existing journal. They do not verify live artifacts,
+execute a transition, stop a unit, or render an automatic rollback service. The
+embedding application retains those actions and must couple any consumed stop
+authorization to the current PID, Linux process start ticks, and systemd
+`InvocationID`. See [rollout safety](rollout-safety.md).
 
 The opt-in `localllm-openai-admission` profile adds a bounded application
 predicate, not a fleet control plane. It exposes only authenticated exact

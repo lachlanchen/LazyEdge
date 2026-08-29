@@ -1,6 +1,6 @@
 {
   "name": "@lazyingart/lazyedge",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "A lightweight, default-deny reverse edge for safely connecting private compute to public domains.",
   "type": "module",
   "license": "MIT",
@@ -20,7 +20,11 @@
     "lazyedge": "bin/lazyedge.mjs"
   },
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./rollout/authority": "./src/rollout-authority.js",
+    "./rollout/contract": "./src/rollout-contract.js",
+    "./rollout/journal": "./src/rollout-journal.js",
+    "./schemas/edge-rollout.schema.json": "./schemas/edge-rollout.schema.json"
   },
   "files": [
     "bin/",
