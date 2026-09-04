@@ -235,6 +235,9 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 86400
+            },
+            "forwardCookies": {
+              "type": "boolean"
             }
           }
         }

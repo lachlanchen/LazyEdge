@@ -239,6 +239,29 @@ test("generic HTTP manifests may expose only the exact root route", () => {
   );
 });
 
+test("cookie forwarding is explicit and restricted to generic HTTP", () => {
+  const generic = manifest();
+  generic.spec.services[0].profile = "generic-http";
+  generic.spec.services[0].public.forwardCookies = true;
+  generic.spec.services[0].public.routes = [{ path: "/", methods: ["GET"] }];
+  assert.equal(normalizeManifest(generic).spec.services[0].public.forwardCookies, true);
+
+  const managed = manifest();
+  managed.spec.services[0].public.forwardCookies = true;
+  assert.throws(
+    () => normalizeManifest(managed),
+    (error) => error?.code === "PROFILE_POLICY",
+  );
+
+  const invalid = manifest();
+  invalid.spec.services[0].profile = "generic-http";
+  invalid.spec.services[0].public.forwardCookies = "yes";
+  assert.throws(
+    () => normalizeManifest(invalid),
+    (error) => error?.code === "INVALID_MANIFEST",
+  );
+});
+
 test("token store persists only SHA-256 digests and enforces expiry, scope, and revoke", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "lazyedge-token-test-"));
   const filePath = path.join(directory, "tokens.json");

@@ -243,7 +243,14 @@ function normalizeService(service, index) {
   const publicSource = object(source.public, `${label}.public`);
   keys(
     publicSource,
-    ["tokenSet", "routes", "maxBodyBytes", "maxConcurrentRequests", "idleTimeoutSeconds"],
+    [
+      "tokenSet",
+      "routes",
+      "maxBodyBytes",
+      "maxConcurrentRequests",
+      "idleTimeoutSeconds",
+      "forwardCookies",
+    ],
     `${label}.public`,
   );
   const tokenSet = requiredString(
@@ -292,6 +299,20 @@ function normalizeService(service, index) {
     left.path.localeCompare(right.path)
     || left.methods.join(",").localeCompare(right.methods.join(","))
   ));
+  if (publicSource.forwardCookies !== undefined && typeof publicSource.forwardCookies !== "boolean") {
+    throw new SecurityError(`${label}.public.forwardCookies must be a boolean`, {
+      code: "INVALID_MANIFEST",
+    });
+  }
+  if (
+    publicSource.forwardCookies === true
+    && profile !== undefined
+    && profile !== "generic-http"
+  ) {
+    throw new SecurityError(`${label}.public.forwardCookies requires generic-http`, {
+      code: "PROFILE_POLICY",
+    });
+  }
 
   const normalized = {
     id,
@@ -321,6 +342,7 @@ function normalizeService(service, index) {
       ),
     },
   };
+  if (publicSource.forwardCookies === true) normalized.public.forwardCookies = true;
   if (exposure === "private") normalized.exposure = exposure;
   if (profile !== undefined) normalized.profile = profile;
   return normalized;

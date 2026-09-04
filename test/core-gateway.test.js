@@ -19,6 +19,7 @@ function createManifest({
   maxBodyBytes = 4096,
   maxConcurrent = 2,
   nodeAdmission = false,
+  browserCookies = false,
 }) {
   return {
     apiVersion: API_VERSION,
@@ -36,7 +37,9 @@ function createManifest({
       },
       services: [{
         id: "localllm",
-        profile: nodeAdmission
+        profile: browserCookies
+          ? "generic-http"
+          : nodeAdmission
           ? LOCALLLM_NODE_ADMISSION_PROFILE
           : LOCALLLM_OPENAI_PROFILE,
         domains: ["llm.example.test"],
@@ -48,11 +51,16 @@ function createManifest({
         },
         public: {
           tokenSet: "personal",
+          ...(browserCookies ? { forwardCookies: true } : {}),
           routes: [
-            { path: "/v1/models", methods: ["GET"] },
-            { path: "/v1/chat/completions", methods: ["POST"] },
-            { path: "/v1/responses", methods: ["POST"] },
-            { path: "/v1/embeddings", methods: ["POST"] },
+            ...(browserCookies ? [
+              { path: "/", methods: ["GET"] },
+            ] : [
+              { path: "/v1/models", methods: ["GET"] },
+              { path: "/v1/chat/completions", methods: ["POST"] },
+              { path: "/v1/responses", methods: ["POST"] },
+              { path: "/v1/embeddings", methods: ["POST"] },
+            ]),
             ...(nodeAdmission ? [
               { path: "/readyz", methods: ["GET"] },
               { path: "/api/node/capabilities", methods: ["GET"] },
@@ -66,6 +74,30 @@ function createManifest({
     },
   };
 }
+
+test("generic HTTP cookie forwarding is opt-in across both guards", async () => {
+  const seen = [];
+  const stack = await createStack((incoming, response) => {
+    seen.push(incoming.headers);
+    response.writeHead(200, {
+      "content-type": "text/plain",
+      "set-cookie": "studio=authenticated; Path=/; HttpOnly; Secure",
+    });
+    response.end("browser-ok");
+  }, { browserCookies: true });
+  try {
+    const allowed = await request(stack.edge.url, "/", {
+      headers: externalHeaders(stack.externalToken, { cookie: "studio=request" }),
+    });
+    assert.equal(allowed.status, 200);
+    assert.equal(allowed.body, "browser-ok");
+    assert.equal(allowed.headers["set-cookie"][0], "studio=authenticated; Path=/; HttpOnly; Secure");
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].cookie, "studio=request");
+  } finally {
+    await stack.close();
+  }
+});
 
 async function startHttpServer(handler) {
   const server = http.createServer(handler);

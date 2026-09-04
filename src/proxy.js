@@ -106,8 +106,10 @@ export function sendJsonError(response, statusCode, code) {
   response.end(payload);
 }
 
-export function sanitizeRequestHeaders(headers, injectHeaders = {}) {
-  const sanitized = copyHeaders(headers, REQUEST_BLOCKED_HEADERS);
+export function sanitizeRequestHeaders(headers, injectHeaders = {}, { forwardCookies = false } = {}) {
+  const blocked = new Set(REQUEST_BLOCKED_HEADERS);
+  if (forwardCookies) blocked.delete("cookie");
+  const sanitized = copyHeaders(headers, blocked);
   for (const [rawName, rawValue] of Object.entries(injectHeaders)) {
     const name = rawName.toLowerCase();
     if (
@@ -122,8 +124,10 @@ export function sanitizeRequestHeaders(headers, injectHeaders = {}) {
   return sanitized;
 }
 
-export function sanitizeResponseHeaders(headers) {
-  return copyHeaders(headers, RESPONSE_BLOCKED_HEADERS);
+export function sanitizeResponseHeaders(headers, { forwardCookies = false } = {}) {
+  const blocked = new Set(RESPONSE_BLOCKED_HEADERS);
+  if (forwardCookies) blocked.delete("set-cookie");
+  return copyHeaders(headers, blocked);
 }
 
 export function proxyHttpRequest(request, response, {
@@ -133,12 +137,16 @@ export function proxyHttpRequest(request, response, {
   timeoutMs = 120_000,
   unavailableStatusCode = 503,
   pathOverride,
+  forwardCookies = false,
 } = {}) {
   if (!Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1) {
     throw new TypeError("maxBodyBytes must be a positive safe integer");
   }
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) {
     throw new TypeError("timeoutMs must be a positive safe integer");
+  }
+  if (typeof forwardCookies !== "boolean") {
+    throw new TypeError("forwardCookies must be a boolean");
   }
   const base = new URL(normalizeLoopbackUrl(target, "proxy target"));
   const requestTarget = parseRequestTarget(pathOverride ?? request.url);
@@ -154,7 +162,7 @@ export function proxyHttpRequest(request, response, {
     return Promise.resolve({ ok: false, code: "body_too_large" });
   }
 
-  const headers = sanitizeRequestHeaders(request.headers, injectHeaders);
+  const headers = sanitizeRequestHeaders(request.headers, injectHeaders, { forwardCookies });
   if (declaredLength !== null) headers["content-length"] = String(declaredLength);
 
   return new Promise((resolve) => {
@@ -191,7 +199,7 @@ export function proxyHttpRequest(request, response, {
         incoming.destroy();
         return;
       }
-      const responseHeaders = sanitizeResponseHeaders(incoming.headers);
+      const responseHeaders = sanitizeResponseHeaders(incoming.headers, { forwardCookies });
       if (String(incoming.headers["content-type"] ?? "").startsWith("text/event-stream")) {
         responseHeaders["cache-control"] = "no-cache, no-transform";
         responseHeaders["x-accel-buffering"] = "no";

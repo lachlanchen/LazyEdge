@@ -243,6 +243,7 @@ export async function startEdgeServer({
         maxBodyBytes: decision.service.public.maxBodyBytes,
         timeoutMs: timeoutMs ?? (decision.service.public.idleTimeoutSeconds * 1000),
         unavailableStatusCode: 503,
+        forwardCookies: decision.service.public.forwardCookies === true,
       });
     } catch {
       sendJsonError(response, 500, "gateway_error");
@@ -372,6 +373,7 @@ export async function startPrivateServiceServer(options = {}) {
         maxBodyBytes: service.public.maxBodyBytes,
         timeoutMs: timeoutMs ?? (service.public.idleTimeoutSeconds * 1000),
         unavailableStatusCode: 503,
+        forwardCookies: service.public.forwardCookies === true,
       });
     } catch {
       sendJsonError(response, 500, "gateway_error");
@@ -522,6 +524,7 @@ export async function startCompatibilityServer(options = {}) {
         timeoutMs: timeoutMs ?? (service.public.idleTimeoutSeconds * 1000),
         unavailableStatusCode: 503,
         pathOverride: isHealth ? service.worker.healthPath : undefined,
+        forwardCookies: service.public.forwardCookies === true,
       });
     } catch {
       sendJsonError(response, 500, "compatibility_gateway_error");

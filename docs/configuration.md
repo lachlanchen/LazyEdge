@@ -109,6 +109,7 @@ The renderer must preserve strict host-key verification, request failure when a 
 | `public.maxBodyBytes` | 1 byte–1 GiB request limit |
 | `public.maxConcurrentRequests` | 1–1024 admitted requests; choose a measured, small value |
 | `public.idleTimeoutSeconds` | 1–86400 seconds; align with proxy/client/upstream timeouts |
+| `public.forwardCookies` | optional, explicit browser-session cookie forwarding; allowed only for `generic-http` |
 
 The profile may be omitted, which behaves as `generic-http`.
 `localllm-openai` permits only a chosen subset of the four reviewed
@@ -173,6 +174,11 @@ Configured paths are canonical, exact absolute paths. Wildcards, repeated separa
 Generic HTTP services may explicitly declare the exact root path `/`. Managed
 API profiles continue to reject it unless their profile policy names it; this
 does not introduce a prefix or catch-all route.
+
+Request `Cookie` and response `Set-Cookie` headers are stripped by default at
+both proxy boundaries. A browser application using the `generic-http` profile
+may opt in with `public.forwardCookies: true`. Managed API profiles reject that
+setting so API capability separation remains unchanged.
 
 Methods are uppercase and limited to `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, and `OPTIONS`. Listing a path does not imply all methods.
 

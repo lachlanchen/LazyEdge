@@ -158,6 +158,7 @@ export async function startWorkerServer({
         maxBodyBytes: service.public.maxBodyBytes,
         timeoutMs: timeoutMs ?? (service.public.idleTimeoutSeconds * 1000),
         unavailableStatusCode: 502,
+        forwardCookies: service.public.forwardCookies === true,
       });
     } catch {
       sendJsonError(response, 500, "worker_error");
