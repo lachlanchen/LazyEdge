@@ -182,6 +182,7 @@ function assertNoTraversal(pathname) {
 }
 
 export function normalizeRoutePath(value, { requireV1 = false } = {}) {
+  if (value === "/" && !requireV1) return value;
   if (
     typeof value !== "string"
     || value.length < 2

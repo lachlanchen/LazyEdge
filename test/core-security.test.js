@@ -214,11 +214,29 @@ test("path and loopback primitives reject parser-confusion inputs", () => {
   ]) {
     assert.throws(() => parseRequestTarget(value));
   }
+  assert.equal(normalizeRoutePath("/"), "/");
+  assert.throws(() => normalizeRoutePath("/", { requireV1: true }));
   assert.throws(() => normalizeRoutePath("/v1/*"));
   assert.throws(() => normalizeLoopbackUrl("http://localhost:8008"));
   assert.throws(() => normalizeLoopbackUrl("http://10.0.0.2:8008"));
   assert.throws(() => normalizeLoopbackListener("0.0.0.0:8008"));
   assert.equal(normalizeLoopbackUrl("http://127.0.0.2:8008"), "http://127.0.0.2:8008");
+});
+
+test("generic HTTP manifests may expose only the exact root route", () => {
+  const generic = manifest();
+  generic.spec.services[0].profile = "generic-http";
+  generic.spec.services[0].public.routes = [{ path: "/", methods: ["GET"] }];
+  assert.deepEqual(normalizeManifest(generic).spec.services[0].public.routes, [
+    { path: "/", methods: ["GET"] },
+  ]);
+
+  const managed = manifest();
+  managed.spec.services[0].public.routes = [{ path: "/", methods: ["GET"] }];
+  assert.throws(
+    () => normalizeManifest(managed),
+    (error) => error?.code === "PROFILE_POLICY",
+  );
 });
 
 test("token store persists only SHA-256 digests and enforces expiry, scope, and revoke", async () => {

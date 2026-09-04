@@ -170,6 +170,10 @@ Never put a secret value in YAML, an environment file committed to Git, a URL, a
 
 Configured paths are canonical, exact absolute paths. Wildcards, repeated separators, traversal components, encoded separators, query strings in route declarations, and fragments are rejected. The public gateway and legacy compatibility listener preserve their existing behavior: a query string on an otherwise approved path is forwarded but cannot select another path. Application-neutral private listeners reject every query string because the current route schema has no query declaration.
 
+Generic HTTP services may explicitly declare the exact root path `/`. Managed
+API profiles continue to reject it unless their profile policy names it; this
+does not introduce a prefix or catch-all route.
+
 Methods are uppercase and limited to `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, and `OPTIONS`. Listing a path does not imply all methods.
 
 ## Validate before render
