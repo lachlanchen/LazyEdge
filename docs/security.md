@@ -39,7 +39,7 @@ LazyEdge cannot contain a fully compromised gateway, worker, root account, SSH k
 | Token in Git/npm/process list | secret stores are outside the manifest; no secrets in argv, examples, logs, or package |
 | One host reads every credential | edge and worker use separate bindings; each runtime opens only its role's stores |
 | Tunnel command injection | manifest values become validated argument arrays, never shell fragments |
-| Resource exhaustion | per-service body and concurrency limits; provider/firewall rate controls remain advisable |
+| Resource exhaustion | default/per-exact-route body limits and service-wide concurrency limits; provider/firewall rate controls remain advisable |
 | Stale authorization | named token sets support issue/list/revoke and deliberate rotation |
 | Legacy or stale node admitted | opt-in LocalLLM admission profile requires authenticated exact documents, immutable matching release IDs, fresh passing canary evidence, and matching model provenance; `/healthz` is transport-only |
 | Silent config drift | validate, plan, render, manifest digest, health probe, and exact rollback target |

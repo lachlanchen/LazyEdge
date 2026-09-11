@@ -151,7 +151,7 @@ function normalizeExistingSiteUpstream(value, label) {
 
 function normalizeRoute(route, serviceLabel, profile) {
   const source = object(route, `${serviceLabel}.public.routes[]`);
-  keys(source, ["path", "methods"], `${serviceLabel}.public.routes[]`);
+  keys(source, ["path", "methods", "maxBodyBytes"], `${serviceLabel}.public.routes[]`);
   const path = normalizeRoutePath(source.path);
   if (!Array.isArray(source.methods) || source.methods.length === 0) {
     throw new SecurityError(`${serviceLabel}.public.routes[].methods must not be empty`);
@@ -175,7 +175,13 @@ function normalizeRoute(route, serviceLabel, profile) {
       });
     }
   }
-  return { path, methods };
+  return {
+    path, methods,
+    ...(source.maxBodyBytes === undefined ? {} : {
+      maxBodyBytes: optionalLimit(source.maxBodyBytes,
+        `${serviceLabel}.public.routes[].maxBodyBytes`, DEFAULT_MAX_BODY_BYTES, 1024 * 1024 * 1024),
+    }),
+  };
 }
 
 function normalizeService(service, index) {

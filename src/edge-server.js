@@ -240,7 +240,7 @@ export async function startEdgeServer({
         injectHeaders: {
           [RELAY_HEADER]: `Bearer ${relayByService.get(decision.service.id)}`,
         },
-        maxBodyBytes: decision.service.public.maxBodyBytes,
+        maxBodyBytes: decision.route?.maxBodyBytes ?? decision.service.public.maxBodyBytes,
         timeoutMs: timeoutMs ?? (decision.service.public.idleTimeoutSeconds * 1000),
         unavailableStatusCode: 503,
         forwardCookies: decision.service.public.forwardCookies === true,
@@ -295,9 +295,9 @@ export async function startPrivateServiceServer(options = {}) {
   const service = manifest.spec.services.find((candidate) => candidate.id === serviceId);
   if (!service) throw new TypeError("Private listener names an unknown serviceId");
 
-  const claims = new Set();
+  const claims = new Map();
   for (const route of service.public.routes) {
-    for (const method of route.methods) claims.add(`${method}\u0000${route.path}`);
+    for (const method of route.methods) claims.set(`${method}\u0000${route.path}`, route);
   }
   const verify = createExternalVerifier(
     { tokenStore, tokenStores, verifyExternalToken },
@@ -321,7 +321,8 @@ export async function startPrivateServiceServer(options = {}) {
       request.resume();
       return;
     }
-    if (requestTarget.query !== "" || !claims.has(`${method}\u0000${requestTarget.path}`)) {
+    const route = claims.get(`${method}\u0000${requestTarget.path}`);
+    if (requestTarget.query !== "" || route === undefined) {
       sendJsonError(response, 404, "not_found");
       request.resume();
       return;
@@ -370,7 +371,7 @@ export async function startPrivateServiceServer(options = {}) {
       await proxyHttpRequest(request, response, {
         target: service.edge.upstream,
         injectHeaders: { [RELAY_HEADER]: `Bearer ${relay}` },
-        maxBodyBytes: service.public.maxBodyBytes,
+        maxBodyBytes: route.maxBodyBytes ?? service.public.maxBodyBytes,
         timeoutMs: timeoutMs ?? (service.public.idleTimeoutSeconds * 1000),
         unavailableStatusCode: 503,
         forwardCookies: service.public.forwardCookies === true,
@@ -442,9 +443,9 @@ export async function startCompatibilityServer(options = {}) {
   ) {
     throw new TypeError("Compatibility listeners only support explicit /v1 API routes");
   }
-  const publicClaims = new Set();
+  const publicClaims = new Map();
   for (const route of service.public.routes) {
-    for (const method of route.methods) publicClaims.add(`${method}\u0000${route.path}`);
+    for (const method of route.methods) publicClaims.set(`${method}\u0000${route.path}`, route);
   }
   const verify = createExternalVerifier(
     { tokenStore, tokenStores, verifyExternalToken },
@@ -473,7 +474,8 @@ export async function startCompatibilityServer(options = {}) {
     const isHealth = method === "GET"
       && requestTarget.path === "/healthz"
       && service.worker.healthPath !== undefined;
-    if (!isHealth && !publicClaims.has(`${method}\u0000${requestTarget.path}`)) {
+    const route = publicClaims.get(`${method}\u0000${requestTarget.path}`);
+    if (!isHealth && route === undefined) {
       sendJsonError(response, 404, "not_found");
       request.resume();
       return;
@@ -520,7 +522,7 @@ export async function startCompatibilityServer(options = {}) {
       await proxyHttpRequest(request, response, {
         target: service.edge.upstream,
         injectHeaders: { [RELAY_HEADER]: `Bearer ${relay}` },
-        maxBodyBytes: service.public.maxBodyBytes,
+        maxBodyBytes: route?.maxBodyBytes ?? service.public.maxBodyBytes,
         timeoutMs: timeoutMs ?? (service.public.idleTimeoutSeconds * 1000),
         unavailableStatusCode: 503,
         pathOverride: isHealth ? service.worker.healthPath : undefined,

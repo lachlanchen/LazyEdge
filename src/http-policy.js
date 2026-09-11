@@ -71,9 +71,9 @@ export function compileWorkerPolicy(service) {
   if (service === null || typeof service !== "object") {
     throw new TypeError("compileWorkerPolicy requires a normalized service");
   }
-  const claims = new Set();
+  const claims = new Map();
   for (const route of service.public.routes) {
-    for (const method of route.methods) claims.add(`${method}\u0000${route.path}`);
+    for (const method of route.methods) claims.set(`${method}\u0000${route.path}`, route);
   }
   const health = service.worker.healthPath;
   return Object.freeze({
@@ -84,6 +84,7 @@ export function compileWorkerPolicy(service) {
           allowed: true,
           reason: "exact-claim",
           service,
+          route: claims.get(`${method}\u0000${path}`),
           target: service.worker.target,
         });
       }

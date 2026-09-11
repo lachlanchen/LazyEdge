@@ -106,7 +106,8 @@ The renderer must preserve strict host-key verification, request failure when a 
 | `worker.healthPath` | optional private transport-health path; it cannot overlap any public route |
 | `public.tokenSet` | name resolved to an external token store through bindings |
 | `public.routes[]` | exact path plus unique uppercase HTTP methods |
-| `public.maxBodyBytes` | 1 byte–1 GiB request limit |
+| `public.maxBodyBytes` | 1 byte–1 GiB default request limit |
+| `public.routes[].maxBodyBytes` | optional 1 byte–1 GiB override for only that exact path and its declared methods |
 | `public.maxConcurrentRequests` | 1–1024 admitted requests; choose a measured, small value |
 | `public.idleTimeoutSeconds` | 1–86400 seconds; align with proxy/client/upstream timeouts |
 | `public.forwardCookies` | optional, explicit browser-session cookie forwarding; allowed only for `generic-http` |
@@ -121,6 +122,24 @@ same external bearer-token, relay-token, and worker upstream-token enforcement
 as inference. No other `/api`, readiness, liveness, management, or wildcard path
 is implied. `generic-http` remains exact-path only and is intended for reviewed
 APIs such as Whisper or SoVITS—not arbitrary TCP forwarding.
+
+An explicit route body limit can be larger or smaller than the service default.
+For example, keep ordinary RPCs at 65536 bytes and declare a reviewed upload
+route with `maxBodyBytes: 25165824`. Both the edge and worker guard select the
+same exact method/path claim; private and compatibility listeners use the same
+rule. Other methods on the same path can have a different claim/limit. No query,
+header, prefix, wildcard or request body selects a limit. Private health probes
+inherit the service default. Omitted route limits add no normalized field, so
+existing manifests retain their digest and behavior.
+
+The override changes only byte admission. Service-wide concurrency and idle
+timeouts remain in force, including across requests to different routes. The
+proxy streams with backpressure, checks declared length before forwarding and
+counts chunked bytes while forwarding; it does not buffer or interpret uploads.
+The upstream must validate its own input and treat incomplete/aborted bodies as
+uncommitted. Qualify actual memory, timeout and cleanup behavior for the chosen
+service limits before changing a live manifest. A new manifest digest requires
+the same reviewed immutable-package deployment and rollback process.
 
 For the admission profile, `doctor --role worker` reports transport and
 application admission independently. The private `worker.healthPath` proves

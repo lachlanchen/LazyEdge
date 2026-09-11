@@ -155,7 +155,7 @@ export async function startWorkerServer({
         injectHeaders: {
           authorization: `Bearer ${localUpstream}`,
         },
-        maxBodyBytes: service.public.maxBodyBytes,
+        maxBodyBytes: decision.route?.maxBodyBytes ?? service.public.maxBodyBytes,
         timeoutMs: timeoutMs ?? (service.public.idleTimeoutSeconds * 1000),
         unavailableStatusCode: 502,
         forwardCookies: service.public.forwardCookies === true,

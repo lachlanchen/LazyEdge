@@ -132,6 +132,12 @@
       "additionalProperties": false,
       "required": ["path", "methods"],
       "properties": {
+        "maxBodyBytes": {
+          "description": "Optional request-body limit for only this exact path and its declared methods; otherwise inherit public.maxBodyBytes.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1073741824
+        },
         "path": {
           "type": "string",
           "maxLength": 2048,
