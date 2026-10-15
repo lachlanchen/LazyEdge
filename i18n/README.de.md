@@ -12,9 +12,12 @@ LazyEdge löst asymmetrische Erreichbarkeit: Ihre Workstation kann einen Cloud-S
 
 > **Datenschutzversprechen:** **LazyEdge sendet keine Telemetrie, sucht nicht selbstständig nach Diensten und veröffentlicht kein nicht deklariertes Ziel. Nur ausdrücklich im Manifest deklarierte Routen können erzeugt werden. Anfrageinhalte durchlaufen ausschließlich die von Ihnen konfigurierten Gateway- und Worker-Endpunkte; LazyEdge speichert keine Anfragekörper dauerhaft.** Der konfigurierte Proxy, das Systemjournal, der Upstream-Dienst oder Cloud-Anbieter kann eigene Protokollierungsregeln haben; lesen Sie das [Bedrohungsmodell](../docs/security.md).
 
-| Donate | PayPal | Stripe |
-| --- | --- | --- |
-| [![Donate](https://img.shields.io/badge/Donate-LazyingArt-0EA5E9?style=for-the-badge&logo=kofi&logoColor=white)](https://chat.lazying.art/donate) | [![PayPal](https://img.shields.io/badge/PayPal-RongzhouChen-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/RongzhouChen) | [![Stripe](https://img.shields.io/badge/Stripe-Donate-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://buy.stripe.com/aFadR8gIaflgfQV6T4fw400) |
+<!-- support:start -->
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsors-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/lachlanchen)
+[![LazyingArt Support](https://img.shields.io/badge/LazyingArt-Support-0EA5E9?style=for-the-badge)](https://chat.lazying.art/donate)
+[![PayPal Support](https://img.shields.io/badge/PayPal-Support-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/RongzhouChen)
+[![Stripe Support](https://img.shields.io/badge/Stripe-Support-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://buy.stripe.com/aFadR8gIaflgfQV6T4fw400)
+<!-- support:end -->
 
 ## Funktionsweise
 

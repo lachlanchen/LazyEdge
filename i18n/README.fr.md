@@ -12,9 +12,12 @@ LazyEdge résout l'asymétrie de connectivité : votre station peut joindre un s
 
 > **Promesse de confidentialité :** **LazyEdge n'envoie aucune télémétrie, ne découvre aucun service et n'expose aucune cible non déclarée. Seules les routes explicitement déclarées dans le manifeste peuvent être générées. Le contenu des requêtes ne transite que par les points de terminaison de passerelle et de worker que vous configurez, et LazyEdge ne conserve pas les corps de requêtes.** Le proxy, le journal système, le service amont ou le fournisseur cloud configuré peut appliquer sa propre politique de journalisation ; consultez le [modèle de menace](../docs/security.md).
 
-| Donate | PayPal | Stripe |
-| --- | --- | --- |
-| [![Donate](https://img.shields.io/badge/Donate-LazyingArt-0EA5E9?style=for-the-badge&logo=kofi&logoColor=white)](https://chat.lazying.art/donate) | [![PayPal](https://img.shields.io/badge/PayPal-RongzhouChen-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/RongzhouChen) | [![Stripe](https://img.shields.io/badge/Stripe-Donate-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://buy.stripe.com/aFadR8gIaflgfQV6T4fw400) |
+<!-- support:start -->
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsors-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/lachlanchen)
+[![LazyingArt Support](https://img.shields.io/badge/LazyingArt-Support-0EA5E9?style=for-the-badge)](https://chat.lazying.art/donate)
+[![PayPal Support](https://img.shields.io/badge/PayPal-Support-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/RongzhouChen)
+[![Stripe Support](https://img.shields.io/badge/Stripe-Support-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://buy.stripe.com/aFadR8gIaflgfQV6T4fw400)
+<!-- support:end -->
 
 ## Fonctionnement
 

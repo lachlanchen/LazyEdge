@@ -12,9 +12,12 @@ LazyEdge는 비대칭 연결 문제를 해결합니다. 워크스테이션은 �
 
 > **개인정보 보호 약속:** **LazyEdge는 원격 측정 데이터를 보내거나 서비스를 탐색하거나 선언되지 않은 대상을 노출하지 않습니다. 매니페스트에 명시적으로 선언한 경로만 생성할 수 있습니다. 요청 내용은 사용자가 설정한 게이트웨이와 워커 엔드포인트만 통과하며 LazyEdge는 요청 본문을 영구 저장하지 않습니다.** 설정한 프록시, 시스템 저널, 업스트림 또는 클라우드 제공자는 자체 로깅 정책을 가질 수 있으므로 [위협 모델](../docs/security.md)을 확인하세요.
 
-| Donate | PayPal | Stripe |
-| --- | --- | --- |
-| [![Donate](https://img.shields.io/badge/Donate-LazyingArt-0EA5E9?style=for-the-badge&logo=kofi&logoColor=white)](https://chat.lazying.art/donate) | [![PayPal](https://img.shields.io/badge/PayPal-RongzhouChen-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/RongzhouChen) | [![Stripe](https://img.shields.io/badge/Stripe-Donate-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://buy.stripe.com/aFadR8gIaflgfQV6T4fw400) |
+<!-- support:start -->
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsors-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/lachlanchen)
+[![LazyingArt Support](https://img.shields.io/badge/LazyingArt-Support-0EA5E9?style=for-the-badge)](https://chat.lazying.art/donate)
+[![PayPal Support](https://img.shields.io/badge/PayPal-Support-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/RongzhouChen)
+[![Stripe Support](https://img.shields.io/badge/Stripe-Support-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://buy.stripe.com/aFadR8gIaflgfQV6T4fw400)
+<!-- support:end -->
 
 ## 작동 방식
 

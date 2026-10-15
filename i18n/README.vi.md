@@ -12,9 +12,12 @@ LazyEdge giải quyết khả năng kết nối bất đối xứng: máy trạm
 
 > **Cam kết quyền riêng tư:** **LazyEdge không gửi dữ liệu đo từ xa, không tự khám phá dịch vụ và không để lộ đích chưa khai báo. Chỉ các tuyến được khai báo rõ ràng trong manifest mới có thể được tạo. Nội dung yêu cầu chỉ đi qua các endpoint gateway và worker do bạn cấu hình, và LazyEdge không lưu lâu dài phần thân yêu cầu.** Proxy, nhật ký hệ thống, upstream hoặc nhà cung cấp đám mây mà bạn cấu hình có thể có chính sách ghi log riêng; hãy đọc [mô hình đe dọa](../docs/security.md).
 
-| Donate | PayPal | Stripe |
-| --- | --- | --- |
-| [![Donate](https://img.shields.io/badge/Donate-LazyingArt-0EA5E9?style=for-the-badge&logo=kofi&logoColor=white)](https://chat.lazying.art/donate) | [![PayPal](https://img.shields.io/badge/PayPal-RongzhouChen-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/RongzhouChen) | [![Stripe](https://img.shields.io/badge/Stripe-Donate-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://buy.stripe.com/aFadR8gIaflgfQV6T4fw400) |
+<!-- support:start -->
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsors-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/lachlanchen)
+[![LazyingArt Support](https://img.shields.io/badge/LazyingArt-Support-0EA5E9?style=for-the-badge)](https://chat.lazying.art/donate)
+[![PayPal Support](https://img.shields.io/badge/PayPal-Support-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/RongzhouChen)
+[![Stripe Support](https://img.shields.io/badge/Stripe-Support-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://buy.stripe.com/aFadR8gIaflgfQV6T4fw400)
+<!-- support:end -->
 
 ## Cách hoạt động
 
